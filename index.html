@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ricettario Interattivo</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Libreria per la generazione di PDF (html2pdf) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Stile personalizzato per un look moderno e pulito a tema cucina */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FAF7F2; /* Sfondo crema/lino per un effetto ricettario */
+        }
+        .recipe-card {
+            transition: all 0.3s ease;
+            cursor: pointer; /* Indica che è cliccabile */
+        }
+        .recipe-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .modal {
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .spinner {
+            border-top-color: #E2725B; /* Terracotta/Arancio per lo spinner */
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Stile per il contenitore degli ingredienti per migliorarne la leggibilità */
+        .ingredients-list {
+            max-height: 120px; /* Altezza massima per l'elenco ingredienti */
+            overflow-y: auto;
+            border: 1px solid #f3f3f3;
+            padding: 8px;
+            background-color: #fffaf7;
+            border-radius: 6px;
+        }
+        .ingredient-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* 2/3 per l'ingrediente, 1/3 per la quantità */
+            padding: 4px 0;
+            border-bottom: 1px dashed #e7e7e7;
+        }
+        .ingredient-item:last-child {
+            border-bottom: none;
+        }
+        /* Contenitore Nascosto per il PDF: deve essere fuori dallo schermo ma avere dimensioni reali per html2pdf */
+        .pdf-content-container {
+            position: absolute;
+            left: -9999px; /* Spostato fuori dallo schermo */
+            top: 0;
+            width: 800px; /* Larghezza definita per una corretta formattazione A4 */
+            height: auto;
+            background-color: white;
+            font-family: 'Inter', sans-serif;
+            padding: 20px;
+        }
+        
+        /* Stili specifici per il modale dettaglio a schermo intero */
+        #detail-modal .modal-content {
+            width: 95%;
+            max-width: 900px; /* Limite la larghezza massima per una migliore lettura su desktop */
+            max-height: 95%;
+            overflow-y: auto;
+        }
+        /* Stile per l'elenco istruzioni nel modale dettaglio */
+        #detail-instructions {
+            white-space: pre-wrap; /* Mantiene gli a capo e gli spazi */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Intestazione (Header) -->
+    <header class="bg-amber-50 shadow-sm sticky top-0 z-10 border-b border-amber-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-green-800">Il Mio Ricettario</h1>
+            <div class="flex items-center space-x-4"> 
+                <!-- Pulsante Le Mie Ricette / Tutte le Ricette -->
+                <button id="my-recipes-toggle-btn" class="hidden font-semibold py-2 px-4 rounded-lg transition duration-150 text-sm whitespace-nowrap"></button>
+                <div id="auth-controls" class="flex space-x-3 items-center">
+                    <div class="text-sm text-gray-500">Caricamento stato...</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenitore Principale -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Controlli di Filtro e Ricerca -->
+        <div class="bg-amber-100 p-6 rounded-xl shadow-lg mb-8 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 border border-amber-200">
+            
+            <!-- Barra di Ricerca -->
+            <input type="text" id="search-input" placeholder="Cerca ricette per nome, ingrediente o istruzioni..."
+                   class="flex-grow p-3 border border-amber-300 rounded-lg focus:ring-green-700 focus:border-green-700 transition duration-150"
+                   oninput="filterRecipes()">
+            
+            <!-- Filtri per Tipo -->
+            <div class="flex space-x-2">
+                <!-- Colori tematici per i filtri -->
+                <button data-filter="All" onclick="setFilter('All')" class="filter-btn bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-800 transition duration-150">Tutte</button>
+                <button data-filter="Salato" onclick="setFilter('Salato')" class="filter-btn bg-amber-200 text-green-800 font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-amber-300 transition duration-150">Salato</button>
+                <button data-filter="Dolce" onclick="setFilter('Dolce')" class="filter-btn bg-amber-200 text-green-800 font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-amber-300 transition duration-150">Dolce</button>
+            </div>
+
+            <!-- Pulsante Aggiungi Ricetta (visibile solo se autenticato) -->
+            <button id="add-recipe-btn" class="hidden bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-orange-700 transition duration-150" onclick="showModal('recipe-modal')">
+                Aggiungi Ricetta
+            </button>
+        </div>
+
+        <!-- Lista Ricette -->
+        <div id="recipe-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Le card delle ricette verranno iniettate qui -->
+            <p class="text-gray-500 col-span-full">Caricamento ricette...</p>
+        </div>
+
+        <!-- Contenitore nascosto per la generazione del PDF -->
+        <div id="pdf-container" class="pdf-content-container"></div>
+
+
+        <!-- Messaggi di Feedback (Errori/Successo) -->
+        <div id="feedback-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+    </main>
+
+    <!-- 1. Modale di Autenticazione (Accesso/Registrazione) -->
+    <div id="auth-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'auth-modal')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-8" onclick="event.stopPropagation()">
+            <h2 id="auth-title" class="text-2xl font-bold mb-6 text-gray-800">Accedi</h2>
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <div class="mb-4" id="username-field" style="display: none;">
+                    <label for="auth-username" class="block text-sm font-medium text-gray-700">Nome Utente</label>
+                    <input type="text" id="auth-username" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Il tuo Nome Utente Pubblico">
+                </div>
+
+                <div class="mb-4">
+                    <label for="auth-email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="auth-email" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                </div>
+                <div class="mb-6">
+                    <label for="auth-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="auth-password" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                </div>
+                <div id="auth-error" class="text-red-600 text-sm mb-4 hidden"></div>
+                
+                <button type="submit" id="auth-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 flex items-center justify-center">
+                    <span id="auth-btn-text">Accedi</span>
+                    <div id="auth-spinner" class="spinner w-5 h-5 border-2 border-white border-solid rounded-full ml-2 hidden"></div>
+                </button>
+            </form>
+
+            <button class="w-full mt-4 text-sm text-gray-500 hover:text-orange-600 transition duration-150" onclick="showAccountModal('reset')">
+                Password dimenticata?
+            </button>
+            
+            <button id="toggle-auth-btn" class="w-full mt-2 text-sm text-orange-600 hover:text-orange-800 transition duration-150" onclick="toggleAuthMode()">
+                Non hai un account? Registrati qui.
+            </button>
+            
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'auth-modal')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- NUOVO MODALE: Gestione Account (Reimposta Password / Aggiorna Email) -->
+    <div id="account-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'account-modal')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-8" onclick="event.stopPropagation()">
+            <h2 id="account-modal-title" class="text-2xl font-bold mb-6 text-gray-800"></h2>
+            
+            <div id="reset-password-form" style="display: none;">
+                <p class="mb-4 text-gray-600 text-sm">Inserisci l'indirizzo email del tuo account. Ti invieremo un link per reimpostare la password.</p>
+                <input type="email" id="reset-email" placeholder="La tua Email" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 mb-4">
+                <button onclick="handlePasswordReset()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150">Invia link di reimpostazione</button>
+            </div>
+
+            <div id="update-email-form" style="display: none;">
+                <p class="mb-4 text-gray-600 text-sm">L'aggiornamento dell'email richiede una nuova autenticazione e potrebbe inviare un'email di verifica.</p>
+                <div class="mb-4">
+                    <label for="new-email" class="block text-sm font-medium text-gray-700">Nuova Email</label>
+                    <input type="email" id="new-email" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                </div>
+                <div class="mb-4">
+                    <label for="current-password-reauth" class="block text-sm font-medium text-gray-700">Password Attuale (per sicurezza)</label>
+                    <input type="password" id="current-password-reauth" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                </div>
+                <button onclick="handleEmailUpdate()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150">Aggiorna Email</button>
+            </div>
+
+            <div id="account-error" class="text-red-600 text-sm mt-4 hidden"></div>
+
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'account-modal')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- 2. Modale Aggiungi/Modifica Ricetta -->
+    <div id="recipe-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'recipe-modal')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl p-8" onclick="event.stopPropagation()">
+            <h2 id="recipe-modal-title" class="text-2xl font-bold mb-6 text-gray-800">Aggiungi Nuova Ricetta</h2>
+            <form id="recipe-form" onsubmit="handleRecipeSubmit(event)">
+                <input type="hidden" id="recipe-id">
+                
+                <!-- Nome Ricetta -->
+                <div class="mb-4">
+                    <label for="recipe-name" class="block text-sm font-medium text-gray-700">Nome Ricetta</label>
+                    <input type="text" id="recipe-name" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                </div>
+
+                <!-- Tipo -->
+                <div class="mb-4">
+                    <label for="recipe-type" class="block text-sm font-medium text-gray-700">Tipo</label>
+                    <select id="recipe-type" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                        <option value="Salato">Salato</option>
+                        <option value="Dolce">Dolce</option>
+                    </select>
+                </div>
+                
+                <!-- Ingredienti Strutturati -->
+                <div class="mb-4">
+                    <label for="recipe-ingredients" class="block text-sm font-medium text-gray-700">
+                        Ingredienti (Nome e Quantità, separati da un trattino o spazio)
+                        <span class="text-xs text-gray-500 block">Es: Farina - 100gr, Uova - 2</span>
+                    </label>
+                    <textarea id="recipe-ingredients" rows="4" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Farina - 100gr&#10;Acqua - 50ml&#10;Sale - q.b."></textarea>
+                </div>
+                
+                <!-- Istruzioni -->
+                <div class="mb-6">
+                    <label for="recipe-instructions" class="block text-sm font-medium text-gray-700">Istruzioni</label>
+                    <textarea id="recipe-instructions" rows="6" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"></textarea>
+                </div>
+
+                <button type="submit" id="recipe-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150">
+                    Salva Ricetta
+                </button>
+            </form>
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'recipe-modal')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. Modale di Conferma Eliminazione -->
+    <div id="delete-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'delete-modal')">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8" onclick="event.stopPropagation()">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Conferma Eliminazione</h2>
+            <p class="mb-6 text-gray-600">Sei sicuro di voler eliminare la ricetta "<span id="delete-recipe-name" class="font-semibold"></span>"? Questa operazione è irreversibile.</p>
+            <div class="flex justify-end space-x-4">
+                <button class="bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-400 transition" onclick="closeModal(null, 'delete-modal')">Annulla</button>
+                <button id="confirm-delete-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition" data-recipe-id="" onclick="confirmDeleteRecipe()">
+                    Elimina
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 4. NUOVO Modale Dettaglio Ricetta a Schermo Intero -->
+    <div id="detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'detail-modal')">
+        <div class="modal-content bg-white rounded-xl shadow-2xl p-8 lg:p-12" onclick="event.stopPropagation()">
+            
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'detail-modal')">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+
+            <div id="detail-content">
+                <!-- I dettagli della ricetta verranno iniettati qui -->
+            </div>
+            
+            <div class="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+                 <!-- Pulsanti Azione (PDF e Modifica) -->
+                 <button id="detail-pdf-btn" onclick="" class="flex items-center space-x-2 text-sm bg-blue-500 text-white font-medium py-3 px-5 rounded-lg hover:bg-blue-600 transition shadow-md">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                    Scarica PDF
+                 </button>
+                 <button id="detail-edit-btn" onclick="" class="hidden text-sm bg-orange-600 text-white font-medium py-3 px-5 rounded-lg hover:bg-orange-700 transition shadow-md">
+                    Modifica Ricetta
+                 </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInAnonymously, onAuthStateChanged, 
+            createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, 
+            updateProfile, sendEmailVerification, sendPasswordResetEmail, 
+            updateEmail, EmailAuthProvider, reauthenticateWithCredential
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, 
+            getDocs, serverTimestamp, setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Variabili globali per l'ambiente (sostituire con i valori reali in produzione)
+        const __app_id = 'ricettario-7fb05'; // Esempio
+        const __firebase_config = JSON.stringify({
+            apiKey: "AIzaSyDysiPop06GJMVnRw1S5Zk47vyucE7s-Ns", 
+            authDomain: "ricettario-7fb05.firebaseapp.com", 
+            projectId: "ricettario-7fb05", 
+            storageBucket: "ricettario-7fb05.appspot.com", 
+            messagingSenderId: "240596404907", 
+            appId: "AIzaSyDysiPop06GJMVnRw1S5Zk47vyucE7s-Ns" 
+        });
+        const __initial_auth_token = ''; // Token di autenticazione custom, se fornito dall'ambiente
+
+        // Configurazione Firebase
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId || 'local-default-app-id';
+        
+        // Impostazioni Firebase
+        setLogLevel('Debug');
+        let app;
+        let db;
+        let auth;
+        
+        let userId = null;
+        let userName = null;
+        let isAuthReady = false;
+        let recipes = [];       // Cache locale delle ricette
+        let authMode = 'login'; 
+        let currentFilter = 'All'; 
+        let currentView = 'All';    
+        let currentSearch = '';    
+
+        // Funzione per ottenere il percorso della collezione pubblica per le ricette
+        function getRecipesCollectionPath() {
+            return `artifacts/${appId}/public/data/recipes`;
+        }
+
+        // --- UTILITY / UI FUNCTIONS ---
+
+        // Gestione dei Modali (mostra/nascondi)
+        window.showModal = (id, recipe = null) => {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('invisible', 'opacity-0');
+                modal.classList.add('visible', 'opacity-100');
+                
+                // Popola il modale Modifica/Elimina se una ricetta è fornita
+                if (id === 'recipe-modal' && recipe) {
+                    document.getElementById('recipe-modal-title').textContent = 'Modifica Ricetta';
+                    document.getElementById('recipe-id').value = recipe.id;
+                    document.getElementById('recipe-name').value = recipe.name;
+                    document.getElementById('recipe-type').value = recipe.type;
+                    
+                    // Converte l'array di oggetti ingredienti in una stringa "Nome - Quantità"
+                    const ingredientsString = recipe.ingredients.map(ing => `${ing.nome} - ${ing.quantita}`).join('\n');
+                    document.getElementById('recipe-ingredients').value = ingredientsString; 
+                    
+                    document.getElementById('recipe-instructions').value = recipe.instructions;
+                    document.getElementById('recipe-submit-btn').textContent = 'Aggiorna Ricetta';
+                } else if (id === 'recipe-modal' && !recipe) {
+                    document.getElementById('recipe-modal-title').textContent = 'Aggiungi Nuova Ricetta';
+                    document.getElementById('recipe-form').reset();
+                    document.getElementById('recipe-id').value = '';
+                    document.getElementById('recipe-submit-btn').textContent = 'Salva Ricetta';
+                } else if (id === 'delete-modal' && recipe) {
+                    document.getElementById('delete-recipe-name').textContent = recipe.name;
+                    document.getElementById('confirm-delete-btn').dataset.recipeId = recipe.id;
+                }
+            }
+        };
+
+        window.closeModal = (event, id) => {
+            // Controlla se il click è avvenuto all'esterno del modale (ovvero sull'overlay)
+            if (event && event.target.id !== id) return; 
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('visible', 'opacity-100');
+                modal.classList.add('invisible', 'opacity-0');
+            }
+        };
+
+        // Funzione per mostrare messaggi di feedback temporanei
+        function showFeedback(message, isError = false) {
+            const container = document.getElementById('feedback-container');
+            const feedbackEl = document.createElement('div');
+            
+            const baseClass = "p-4 rounded-lg shadow-xl text-white font-semibold transform translate-y-0 transition-all duration-300 ease-out";
+            
+            if (isError) {
+                feedbackEl.className = `${baseClass} bg-red-600`;
+            } else {
+                feedbackEl.className = `${baseClass} bg-green-600`;
+            }
+            
+            feedbackEl.textContent = message;
+            container.prepend(feedbackEl); 
+
+            setTimeout(() => {
+                feedbackEl.classList.add('opacity-0', 'translate-y-2');
+                feedbackEl.addEventListener('transitionend', () => feedbackEl.remove());
+            }, 3000);
+        }
+
+        // --- VIEW CONTROL LOGIC ---
+        
+        /**
+         * Toglie la visualizzazione tra 'All' (Tutte) e 'My' (Mie Ricette).
+         */
+        window.toggleRecipeView = () => {
+            currentView = currentView === 'All' ? 'My' : 'All';
+            updateViewControlsUI(); // Aggiorna testo e stile del pulsante
+            renderRecipes(recipes); // Ridisegna la lista
+        };
+
+        /**
+         * Aggiorna la visibilità, il testo e lo stile del pulsante 'Le mie Ricette'
+         */
+        function updateViewControlsUI() {
+            const toggleBtn = document.getElementById('my-recipes-toggle-btn');
+            
+            // 1. Visibilità: Solo se autenticato e non anonimo
+            if (userId && auth.currentUser && !auth.currentUser.isAnonymous) {
+                toggleBtn.classList.remove('hidden');
+                toggleBtn.onclick = window.toggleRecipeView; // Collega il toggle
+                
+                // 2. Contenuto e Stile
+                if (currentView === 'My') {
+                    // Stai visualizzando SOLO le tue ricette -> Pulsante per tornare a TUTTE
+                    toggleBtn.textContent = 'Tutte le Ricette'; 
+                    toggleBtn.classList.remove('bg-amber-200', 'text-green-800', 'hover:bg-amber-300');
+                    toggleBtn.classList.add('bg-green-700', 'text-white', 'shadow-md', 'hover:bg-green-800');
+                } else {
+                    // Stai visualizzando TUTTE le ricette -> Pulsante per passare a MIE
+                    toggleBtn.textContent = 'Le mie Ricette'; 
+                    toggleBtn.classList.remove('bg-green-700', 'text-white', 'shadow-md', 'hover:bg-green-800');
+                    toggleBtn.classList.add('bg-amber-200', 'text-green-800', 'hover:bg-amber-300');
+                }
+            } else {
+                // Nascondi se non autenticato
+                toggleBtn.classList.add('hidden');
+                currentView = 'All'; // Assicura che la vista sia "All" se si disconnette
+            }
+        }
+
+
+        // --- ACCOUNT MANAGEMENT MODAL LOGIC (NUOVO) ---
+
+        /**
+         * Mostra il modale per la gestione dell'account e imposta la modalità (reset o update)
+         * @param {'reset' | 'update'} mode 
+         */
+        window.showAccountModal = (mode) => {
+            closeModal(null, 'auth-modal'); // Chiude l'eventuale modale di autenticazione aperto
+            document.getElementById('account-error').classList.add('hidden');
+            
+            const titleEl = document.getElementById('account-modal-title');
+            const resetForm = document.getElementById('reset-password-form');
+            const updateForm = document.getElementById('update-email-form');
+
+            if (mode === 'reset') {
+                titleEl.textContent = 'Reimposta Password';
+                resetForm.style.display = 'block';
+                updateForm.style.display = 'none';
+                document.getElementById('reset-email').value = auth.currentUser?.email || '';
+                showModal('account-modal');
+            } else if (mode === 'update') {
+                if (!auth.currentUser || auth.currentUser.isAnonymous) {
+                    showFeedback('Per aggiornare l\'email, devi prima accedere con un account email e password.', true);
+                    return;
+                }
+                titleEl.textContent = 'Aggiorna Indirizzo Email';
+                resetForm.style.display = 'none';
+                updateForm.style.display = 'block';
+                document.getElementById('new-email').value = auth.currentUser.email || '';
+                document.getElementById('current-password-reauth').value = '';
+                showModal('account-modal');
+            }
+        }
+
+        /**
+         * Gestisce l'invio dell'email per la reimpostazione della password (password dimenticata)
+         */
+        window.handlePasswordReset = async () => {
+            const email = document.getElementById('reset-email').value;
+            const errorEl = document.getElementById('account-error');
+            errorEl.classList.add('hidden');
+
+            if (!email) {
+                errorEl.textContent = 'Inserisci un indirizzo email valido.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                // Funzione Firebase per inviare l'email di reimpostazione password
+                await sendPasswordResetEmail(auth, email); 
+                showFeedback(`Link di reimpostazione inviato a ${email}. Controlla la tua casella di posta.`, false);
+                closeModal(null, 'account-modal');
+            } catch (error) {
+                console.error("Errore reimpostazione password:", error.code, error.message);
+                let errorMessage = 'Errore reimpostazione. Verifica l\'indirizzo email.';
+                if (error.code === 'auth/user-not-found') {
+                    errorMessage = 'Nessun utente trovato con questo indirizzo email.';
+                }
+                errorEl.textContent = errorMessage;
+                errorEl.classList.remove('hidden');
+            }
+        };
+
+        /**
+         * Gestisce l'aggiornamento dell'indirizzo email di un utente autenticato.
+         */
+        window.handleEmailUpdate = async () => {
+            const newEmail = document.getElementById('new-email').value;
+            const currentPassword = document.getElementById('current-password-reauth').value;
+            const errorEl = document.getElementById('account-error');
+            errorEl.classList.add('hidden');
+
+            const user = auth.currentUser;
+            if (!user || user.isAnonymous) return;
+
+            if (!newEmail || !currentPassword) {
+                errorEl.textContent = 'Devi inserire la nuova email e la tua password attuale.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                // 1. Riautentica l'utente (necessario per operazioni sensibili come cambio email)
+                const credential = EmailAuthProvider.credential(user.email, currentPassword);
+                await reauthenticateWithCredential(user, credential);
+                
+                // 2. Aggiorna l'email
+                await updateEmail(user, newEmail);
+                
+                // 3. Invia una nuova email di verifica al nuovo indirizzo
+                await sendEmailVerification(user); 
+
+                showFeedback(`Email aggiornata con successo a ${newEmail}! Ti è stata inviata una nuova email di verifica.`, false);
+                closeModal(null, 'account-modal');
+
+            } catch (error) {
+                console.error("Errore aggiornamento email:", error.code, error.message);
+                let errorMessage = 'Errore sconosciuto durante l\'aggiornamento dell\'email.';
+                switch (error.code) {
+                    case 'auth/requires-recent-login':
+                        errorMessage = 'Per la tua sicurezza, devi riautenticarti (accedi di nuovo) prima di cambiare l\'email.';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMessage = 'Password attuale non corretta.';
+                        break;
+                    case 'auth/email-already-in-use':
+                        errorMessage = 'Questa email è già in uso da un altro account.';
+                        break;
+                    default:
+                        errorMessage = `Errore: ${error.message.split('(')[0]}`;
+                }
+                errorEl.textContent = errorMessage;
+                errorEl.classList.remove('hidden');
+            }
+        };
+        
+
+        // --- AUTHENTICATION LOGIC ---
+
+        function updateAuthUI() {
+            const authControls = document.getElementById('auth-controls');
+            const addRecipeBtn = document.getElementById('add-recipe-btn');
+            
+            if (isAuthReady) {
+                if (userId && !auth.currentUser.isAnonymous) {
+                    // Utente Autenticato (Email/Password)
+                    const displayUser = userName || auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
+                    authControls.innerHTML = `
+                        <div class="flex flex-col items-end">
+                            <span class="text-sm font-semibold text-gray-700">Ciao, ${displayUser}</span>
+                            <button onclick="showAccountModal('update')" class="text-xs text-blue-500 hover:text-blue-700 mt-0.5">Gestisci Account</button>
+                        </div>
+                        <button onclick="logoutUser()" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition">Logout</button>
+                    `;
+                    addRecipeBtn.classList.remove('hidden');
+                } else {
+                    // Utente Sconosciuto / Anonimo
+                    authControls.innerHTML = `
+                        <button onclick="showModal('auth-modal')" class="bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-700 transition">Accedi / Registrati</button>
+                    `;
+                    addRecipeBtn.classList.add('hidden');
+                    userName = null;
+                }
+            }
+            updateViewControlsUI(); 
+            renderRecipes(recipes);
+        }
+        
+        window.toggleAuthMode = () => {
+            authMode = authMode === 'login' ? 'register' : 'login';
+            document.getElementById('auth-title').textContent = authMode === 'login' ? 'Accedi' : 'Registrati';
+            document.getElementById('auth-btn-text').textContent = authMode === 'login' ? 'Accedi' : 'Registrati';
+            document.getElementById('toggle-auth-btn').textContent = authMode === 'login' 
+                ? 'Non hai un account? Registrati qui.' 
+                : 'Hai già un account? Accedi qui.';
+            
+            document.getElementById('username-field').style.display = authMode === 'register' ? 'block' : 'none';
+
+            document.getElementById('auth-error').textContent = '';
+            document.getElementById('auth-error').classList.add('hidden');
+        };
+
+        async function handleAuth(event) {
+            event.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const username = document.getElementById('auth-username').value.trim();
+            const errorEl = document.getElementById('auth-error');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const spinner = document.getElementById('auth-spinner');
+
+            if (authMode === 'register' && (!username || username.length < 3)) {
+                 errorEl.textContent = 'Il Nome Utente deve contenere almeno 3 caratteri.';
+                 errorEl.classList.remove('hidden');
+                 return;
+            }
+
+            errorEl.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                if (authMode === 'register') {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    await updateProfile(userCredential.user, { displayName: username });
+                    
+                    // NUOVO: Invio email di verifica per la registrazione
+                    await sendEmailVerification(userCredential.user);
+                    
+                    userName = username; 
+                    showFeedback('Registrazione completata! Controlla la tua email per verificare l\'indirizzo.', false);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    userName = auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
+                    showFeedback('Accesso effettuato con successo!', false);
+                }
+                closeModal(null, 'auth-modal');
+            } catch (error) {
+                let errorMessage = 'Errore di autenticazione sconosciuto.';
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                        errorMessage = 'Email o password non validi.';
+                        break;
+                    case 'auth/email-already-in-use':
+                        errorMessage = 'Questa email è già in uso. Prova ad accedere.';
+                        break;
+                    case 'auth/weak-password':
+                        errorMessage = 'La password deve contenere almeno 6 caratteri.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMessage = 'Formato email non valido.';
+                        break;
+                    default:
+                        console.error("Auth Error:", error.code, error.message);
+                        errorMessage = `Errore: ${error.message.split('(')[0]}`;
+                }
+                errorEl.textContent = errorMessage;
+                errorEl.classList.remove('hidden');
+            } finally {
+                spinner.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        }
+        window.handleAuth = handleAuth; 
+
+        window.logoutUser = async () => {
+            try {
+                await signOut(auth);
+                currentView = 'All'; 
+                showFeedback('Disconnessione effettuata con successo.');
+            } catch (error) {
+                console.error("Logout Error:", error);
+                showFeedback('Errore durante il logout.', true);
+            }
+        };
+
+
+        // --- FIRESTORE DATA LOGIC (omissis) ---
+
+        function parseIngredients(ingredientsText) {
+            const lines = ingredientsText.split(/[\n,]/).map(line => line.trim()).filter(line => line.length > 0);
+            return lines.map(line => {
+                const parts = line.split(/[-:\s]{1,}/).map(p => p.trim()).filter(p => p.length > 0);
+                let nome = parts[0] || '';
+                let quantita = parts[1] || 'q.b.';
+                
+                if (parts.length > 2) {
+                    quantita = parts[parts.length - 1];
+                    nome = parts.slice(0, parts.length - 1).join(' ');
+                } else if (parts.length === 1) {
+                    nome = parts[0];
+                    quantita = 'q.b.';
+                }
+                
+                return { nome: nome.trim(), quantita: quantita.trim() };
+            }).filter(ing => ing.nome.length > 0);
+        }
+
+        const initialRecipes = [
+            {
+                name: "Pasta al Pesto",
+                type: "Salato",
+                ingredients: [
+                    { nome: "Pasta", quantita: "320gr" },
+                    { nome: "Pesto", quantita: "180gr" },
+                    { nome: "Pinoli", quantita: "q.b." },
+                    { nome: "Parmigiano Reggiano", quantita: "50gr" }
+                ],
+                instructions: "Cuoci la pasta in abbondante acqua salata. Nel frattempo, scalda leggermente il pesto se necessario. Scola la pasta al dente e versala direttamente nella ciotola con il pesto. Mescola bene. Servi immediatamente con pinoli tostati e scaglie di parmigiano Reggiano.",
+                userId: 'seed-user',
+                userName: 'ChefDemo'
+            },
+            {
+                name: "Tiramisù Classico",
+                type: "Dolce",
+                ingredients: [
+                    { nome: "Savoiardi", quantita: "250gr" },
+                    { nome: "Mascarpone", quantita: "500gr" },
+                    { nome: "Tuorli d'uovo", quantita: "4" },
+                    { nome: "Zucchero", quantita: "100gr" },
+                    { nome: "Caffè espresso", quantita: "200ml" },
+                    { nome: "Cacao amaro", quantita: "q.b." }
+                ],
+                instructions: "Prepara il caffè e lascialo raffreddare. In una ciotola, monta i tuorli con lo zucchero fino a ottenere un composto chiaro e spumoso. Aggiungi il mascarpone e mescola delicatamente. Assembla: intingi velocemente i savoiardi nel caffè e disponi un primo strato in una pirofila. Copri con uno strato di crema al mascarpone. Ripeti l'operazione per un secondo strato. Concludi spolverando abbondantemente con cacao amaro. Lascia riposare in frigorifero per almeno 4 ore prima di servire.",
+                userId: 'seed-user',
+                userName: 'ChefDemo'
+            }
+        ];
+
+        async function seedDatabase() {
+            try {
+                const recipesRef = collection(db, getRecipesCollectionPath());
+                for (const recipe of initialRecipes) {
+                    await setDoc(doc(recipesRef), {
+                        ...recipe,
+                        createdAt: serverTimestamp()
+                    });
+                }
+                console.log("Database seminato con successo.");
+            } catch (error) {
+                console.error("Errore nella semina del database:", error);
+            }
+        }
+
+        window.handleRecipeSubmit = async (event) => {
+            event.preventDefault();
+            
+            if (!userId || auth.currentUser.isAnonymous) {
+                showFeedback('Devi essere autenticato con un account (non anonimo) per salvare una ricetta.', true);
+                return;
+            }
+
+            const id = document.getElementById('recipe-id').value;
+            const name = document.getElementById('recipe-name').value.trim();
+            const type = document.getElementById('recipe-type').value;
+            
+            const ingredientsText = document.getElementById('recipe-ingredients').value;
+            const ingredients = parseIngredients(ingredientsText);
+
+            if (ingredients.length === 0) {
+                 showFeedback('Devi inserire almeno un ingrediente.', true);
+                 return;
+            }
+            
+            const instructions = document.getElementById('recipe-instructions').value.trim();
+            
+            const currentUserName = auth.currentUser.displayName || auth.currentUser?.email.split('@')[0] || 'Utente Sconosciuto';
+            userName = currentUserName;
+
+            const recipeData = {
+                name, type, ingredients, instructions,
+                userId: userId,
+                userName: currentUserName
+            };
+
+            closeModal(null, 'recipe-modal');
+            
+            try {
+                const recipesRef = collection(db, getRecipesCollectionPath());
+                if (id) {
+                    // Update (Modifica)
+                    const recipeDocRef = doc(recipesRef, id);
+                    await setDoc(recipeDocRef, recipeData, { merge: true });
+                    showFeedback('Ricetta aggiornata con successo!');
+                } else {
+                    // Create (Creazione)
+                    await setDoc(doc(recipesRef), {
+                        ...recipeData,
+                        createdAt: serverTimestamp()
+                    });
+                    showFeedback('Ricetta aggiunta con successo!');
+                }
+            } catch (error) {
+                console.error("Errore nel salvataggio della ricetta:", error);
+                showFeedback('Errore nel salvataggio della ricetta. Controlla i permessi.', true);
+            }
+        };
+
+        window.confirmDeleteRecipe = async () => {
+            const recipeId = document.getElementById('confirm-delete-btn').dataset.recipeId;
+            if (!recipeId || !userId || auth.currentUser.isAnonymous) {
+                showFeedback('Errore: Devi essere autenticato con un account (non anonimo) per eliminare una ricetta.', true);
+                closeModal(null, 'delete-modal');
+                return;
+            }
+
+            closeModal(null, 'delete-modal');
+
+            try {
+                const recipeDocRef = doc(db, getRecipesCollectionPath(), recipeId);
+                await deleteDoc(recipeDocRef);
+                showFeedback('Ricetta eliminata con successo.');
+            } catch (error) {
+                console.error("Errore nell'eliminazione della ricetta:", error);
+                showFeedback("Errore nell'eliminazione della ricetta. Controlla i permessi.", true);
+            }
+        };
+
+        // --- DETTAGLIO RICETTA (NUOVO) ---
+        
+        /**
+         * Mostra tutti i dettagli di una ricetta in un modale a schermo intero.
+         * @param {string} recipeId L'ID della ricetta da mostrare.
+         */
+        window.showRecipeDetail = (recipeId) => {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) {
+                showFeedback('Errore: Dettagli della ricetta non trovati.', true);
+                return;
+            }
+
+            const detailContentEl = document.getElementById('detail-content');
+            const detailEditBtn = document.getElementById('detail-edit-btn');
+            const detailPdfBtn = document.getElementById('detail-pdf-btn');
+            
+            const isAuthor = userId === recipe.userId && auth.currentUser && !auth.currentUser.isAnonymous; 
+            const typeColorClass = recipe.type === 'Dolce' ? 'rose-500' : 'green-700';
+            
+            // 1. Genera l'HTML per gli ingredienti
+            let ingredientsListHtml = '';
+            if (Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0) {
+                ingredientsListHtml = `
+                    <div class="space-y-2">
+                        ${recipe.ingredients.map(ing => `
+                            <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                                <span class="text-lg text-gray-800">${ing.nome || 'N/D'}</span>
+                                <span class="text-lg font-semibold text-${typeColorClass}">${ing.quantita || 'q.b.'}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // 2. Inietta il contenuto nel modale
+            detailContentEl.innerHTML = `
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                         <h1 class="text-4xl font-extrabold text-gray-900">${recipe.name}</h1>
+                         <span class="inline-block text-sm font-bold py-1 px-4 rounded-full text-white bg-${typeColorClass}">${recipe.type}</span>
+                    </div>
+                    <p class="text-md text-gray-500">
+                        di <span class="font-semibold text-gray-700">${recipe.userName}</span>
+                    </p>
+                </div>
+                
+                <!-- Contenitore Principale -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Ingredienti -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Ingredienti</h2>
+                        <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
+                            ${ingredientsListHtml}
+                        </div>
+                    </div>
+
+                    <!-- Istruzioni -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Procedimento</h2>
+                        <p id="detail-instructions" class="text-gray-700 leading-relaxed">
+                            ${recipe.instructions}
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            // 3. Collega i pulsanti di azione
+            detailPdfBtn.onclick = () => {
+                // Previene che il modale dettaglio chiuda il PDF.
+                closeModal(null, 'detail-modal'); 
+                generateRecipePdf(recipe.id);
+            };
+
+            if (isAuthor) {
+                // Per Modifica, dobbiamo passare l'oggetto completo
+                const recipeJsonString = JSON.stringify(recipe).replace(/"/g, '&quot;');
+                detailEditBtn.onclick = () => {
+                    closeModal(null, 'detail-modal');
+                    showModal('recipe-modal', recipe);
+                };
+                detailEditBtn.classList.remove('hidden');
+            } else {
+                detailEditBtn.classList.add('hidden');
+            }
+
+
+            // 4. Mostra il modale
+            showModal('detail-modal');
+        };
+
+        // --- PDF GENERATION LOGIC (omissis) ---
+
+        /**
+         * Genera e scarica il PDF della ricetta dato il suo ID.
+         * @param {string} recipeId L'ID della ricetta da scaricare.
+         */
+        window.generateRecipePdf = (recipeId) => {
+            // 1. Trova la ricetta completa dalla cache locale
+            const recipe = recipes.find(r => r.id === recipeId);
+
+            if (!recipe) {
+                showFeedback('Errore: Ricetta non trovata per la generazione PDF.', true);
+                return;
+            }
+            
+            showFeedback('Generazione PDF in corso...');
+            
+            const pdfContainer = document.getElementById('pdf-container');
+            
+            // Colori tematici per Salato/Dolce
+            const typeColor = recipe.type === 'Dolce' ? '#f472b6' : '#047857'; // Tailwind rose-400 vs green-700
+            const typeBg = recipe.type === 'Dolce' ? '#fde0e6' : '#d1fae5'; // Light background
+
+            // 2. Costruisci il contenuto HTML per il PDF in un formato leggibile e stampabile
+            let ingredientsHtml = '<ul style="list-style: none; padding: 0;">';
+            // Utilizza un semplice forEach/map per creare le righe di testo
+            recipe.ingredients.forEach(ing => {
+                ingredientsHtml += `<li style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #ddd; font-size: 14px;">
+                    <span style="font-weight: 500;">${ing.nome || 'N/D'}</span>
+                    <span style="color: #4b5563;">${ing.quantita || 'q.b.'}</span>
+                </li>`;
+            });
+            ingredientsHtml += '</ul>';
+            
+            // Le istruzioni vanno convertite in un elenco numerato e gestite le interruzioni di riga (con <br> o <p>)
+            const instructionsArray = recipe.instructions.split('\n').filter(line => line.trim() !== '');
+            let instructionsHtml = '<ol style="padding-left: 20px; margin: 0; list-style-type: decimal;">';
+            instructionsArray.forEach(step => {
+                instructionsHtml += `<li style="margin-bottom: 10px; font-size: 16px; color: #374151;">${step.trim()}</li>`;
+            });
+            instructionsHtml += '</ol>';
+
+
+            // 3. Inietta l'HTML nel contenitore nascosto
+            // IMPORTANTISSIMO: L'uso di white-space: pre-wrap è stato rimosso in quanto html2pdf lo gestisce male; abbiamo formattato con <ol> e <li>
+            pdfContainer.innerHTML = `
+                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                    <h1 style="font-size: 32px; font-weight: bold; color: #1f2937; margin-bottom: 5px; text-align: center;">${recipe.name}</h1>
+                    <div style="margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="background-color: ${typeBg}; color: ${typeColor}; padding: 4px 12px; border-radius: 9999px; font-size: 14px; font-weight: 600;">
+                            ${recipe.type}
+                        </span>
+                        <p style="font-size: 14px; color: #6b7280;">Autore: <span style="font-weight: 600; color: #374151;">${recipe.userName}</span></p>
+                    </div>
+
+                    <h2 style="font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid ${typeColor}; padding-bottom: 5px;">Ingredienti</h2>
+                    <div style="border: 1px solid #f3f4f6; padding: 10px; border-radius: 6px;">
+                        ${ingredientsHtml}
+                    </div>
+
+                    <h2 style="font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 30px; margin-bottom: 10px; border-bottom: 2px solid ${typeColor}; padding-bottom: 5px;">Istruzioni</h2>
+                    ${instructionsHtml}
+                </div>
+            `;
+            
+            // 4. Opzioni di configurazione per html2pdf
+            const options = {
+                margin: 10,
+                filename: `${recipe.name.replace(/\s/g, '_')}_Ricetta.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // 5. Genera e scarica il PDF
+            html2pdf().from(pdfContainer.querySelector('#pdf-document-content')).set(options).save()
+                .then(() => {
+                    showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
+                    pdfContainer.innerHTML = ''; // Pulisce il contenitore nascosto
+                })
+                .catch(error => {
+                    console.error('Errore durante la generazione del PDF:', error);
+                    showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
+                    pdfContainer.innerHTML = '';
+                });
+        };
+
+        // --- RECIPE RENDERING & FILTERING (omissis) ---
+        
+        // Filtro corrente
+        window.setFilter = (filterType) => {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const isSelected = btn.dataset.filter === filterType;
+
+                if (isSelected) {
+                    btn.classList.remove('bg-amber-200', 'text-green-800', 'hover:bg-amber-300');
+                    btn.classList.add('bg-green-700', 'text-white', 'hover:bg-green-800');
+                } else {
+                    btn.classList.remove('bg-green-700', 'text-white', 'hover:bg-green-800');
+                    btn.classList.add('bg-amber-200', 'text-green-800', 'hover:bg-amber-300');
+                }
+            });
+            currentFilter = filterType;
+            filterRecipes();
+        };
+
+        // Aggiorna la variabile di ricerca e applica i filtri
+        window.filterRecipes = () => {
+            currentSearch = document.getElementById('search-input').value.toLowerCase().trim();
+            renderRecipes(recipes); // Ridisegna con i nuovi filtri/ricerca
+        };
+
+        // Funzione per renderizzare la lista di ricette (applicando filtri locali)
+        function renderRecipes(recipeList) {
+            const recipeListEl = document.getElementById('recipe-list');
+            recipeListEl.innerHTML = ''; // Pulisce la lista
+
+            let filteredList = recipeList;
+            
+            // 0. Filtro per Vista (All vs My) - Prevale su tutto
+            if (currentView === 'My' && userId) {
+                filteredList = filteredList.filter(r => r.userId === userId);
+            }
+
+            // 1. Filtro per Tipo
+            if (currentFilter !== 'All') {
+                filteredList = filteredList.filter(r => r.type === currentFilter);
+            }
+
+            // 2. Filtro per Ricerca Testuale
+            if (currentSearch.length > 0) {
+                filteredList = filteredList.filter(r => 
+                    r.name.toLowerCase().includes(currentSearch) ||
+                    r.type.toLowerCase().includes(currentSearch) ||
+                    r.userName.toLowerCase().includes(currentSearch) ||
+                    r.ingredients.some(ing => 
+                        (ing.nome && ing.nome.toLowerCase().includes(currentSearch)) || 
+                        (ing.quantita && ing.quantita.toLowerCase().includes(currentSearch))
+                    ) ||
+                    r.instructions.toLowerCase().includes(currentSearch)
+                );
+            }
+
+            if (filteredList.length === 0) {
+                const message = currentView === 'My' 
+                    ? 'Non hai ancora ricette personali. Aggiungine una!' 
+                    : 'Nessuna ricetta trovata con i filtri correnti.';
+                recipeListEl.innerHTML = `<p class="text-gray-500 col-span-full p-4">${message}</p>`;
+                return;
+            }
+
+            filteredList.forEach(recipe => {
+                const recipeId = recipe.id;
+                
+                // Variabile per indicare se l'utente è l'autore e autenticato non anonimo
+                const isAuthor = userId === recipe.userId && auth.currentUser && !auth.currentUser.isAnonymous; 
+                
+                // Colori tematici per Salato/Dolce
+                const typeColorClass = recipe.type === 'Dolce' ? 'rose-400' : 'green-700'; 
+                
+                const recipeCard = document.createElement('div');
+                recipeCard.className = `recipe-card bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between border-t-4 border-${typeColorClass} border-b-2`;
+                
+                // Aggiungiamo l'handler per il click sulla CARD che apre il modale di dettaglio
+                recipeCard.onclick = (e) => {
+                    // Previene l'esecuzione se il click è su un pulsante all'interno della card
+                    if (e.target.closest('button')) {
+                        e.stopPropagation(); 
+                        return;
+                    }
+                    showRecipeDetail(recipeId);
+                };
+
+
+                // Generazione della lista di ingredienti strutturati (versione compatta per la card)
+                let ingredientsListHtml = '';
+                if (Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0) {
+                    ingredientsListHtml = `
+                        <div class="ingredients-list">
+                            <div class="ingredient-item text-xs font-bold text-gray-800 border-none pb-1">
+                                <span>Ingrediente</span>
+                                <span class="text-right">Quantità</span>
+                            </div>
+                            ${recipe.ingredients.slice(0, 4).map(ing => `
+                                <div class="ingredient-item text-sm text-gray-700">
+                                    <span class="truncate pr-2">${ing.nome || 'N/D'}</span>
+                                    <span class="text-right font-medium text-gray-600">${ing.quantita || 'q.b.'}</span>
+                                </div>
+                            `).join('')}
+                            ${recipe.ingredients.length > 4 ? '<p class="text-xs text-center pt-1 text-gray-500">... Altri ingredienti ...</p>' : ''}
+                        </div>
+                    `;
+                }
+
+                // Per Modifica/Elimina, dobbiamo passare l'oggetto completo, quindi lo serializziamo qui
+                const recipeJsonString = JSON.stringify(recipe).replace(/"/g, '&quot;');
+
+
+                recipeCard.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">${recipe.type}</span>
+                            <p class="text-xs text-gray-500">di <span class="font-semibold text-gray-700">${recipe.userName}</span></p>
+                        </div>
+                        
+                        <h3 class="text-xl font-bold text-gray-900 mb-4">${recipe.name}</h3>
+
+                        <div class="mb-4">
+                            <h4 class="text-md font-semibold text-gray-800 mb-2">Ingredienti:</h4>
+                            ${ingredientsListHtml}
+                        </div>
+                        <div class="mb-4">
+                            <h4 class="text-md font-semibold text-gray-800 mb-1">Procedimento:</h4>
+                            <p class="text-gray-600 text-sm max-h-16 overflow-hidden">${recipe.instructions.substring(0, 150)}...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Controlli PDF / Modifica / Elimina -->
+                    <div class="pt-4 mt-auto border-t border-gray-100 flex justify-between items-center">
+                        <!-- Pulsante PDF per tutti - Usa solo l'ID -->
+                        <button onclick="generateRecipePdf('${recipeId}')"
+                                class="flex items-center space-x-1 text-sm bg-blue-500 text-white font-medium py-2 px-3 rounded-lg hover:bg-blue-600 transition">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                            <span>Scarica PDF</span>
+                        </button>
+
+                        <!-- Controlli Modifica/Elimina (solo per l'autore) -->
+                        <div class="flex space-x-2 ${isAuthor ? '' : 'hidden'}">
+                            <button onclick="showModal('recipe-modal', ${recipeJsonString})" 
+                                    class="text-sm text-orange-600 hover:text-orange-800 font-medium transition">
+                                Modifica
+                            </button>
+                            <button onclick="showModal('delete-modal', ${recipeJsonString})"
+                                    class="text-sm text-red-600 hover:text-red-800 font-medium transition">
+                                Elimina
+                            </button>
+                        </div>
+                    </div>
+                `;
+                recipeListEl.appendChild(recipeCard);
+            });
+        }
+
+
+        // --- FIREBASE INITIALIZATION ---
+
+        window.onload = function() {
+            try {
+                // Inizializza Firebase
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // 1. Gestione dell'autenticazione iniziale
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userName = user.displayName || (user.email ? user.email.split('@')[0] : 'Utente Anonimo');
+
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            try {
+                                // signInWithCustomToken gestito dall'ambiente.
+                            } catch (e) {
+                                console.error("Errore nell'autenticazione con token custom (Ignorato in ambiente di test):", e);
+                            }
+                        }
+                    } else {
+                        // Utente disconnesso (locale): esegui l'accesso anonimo per consentire la lettura pubblica
+                        if (auth.currentUser === null || auth.currentUser.isAnonymous === false) {
+                            signInAnonymously(auth).catch(e => {
+                                console.error("Errore nell'accesso anonimo:", e);
+                            });
+                        }
+                        userId = auth.currentUser?.uid || null;
+                        userName = null;
+                    }
+                    
+                    isAuthReady = true;
+                    updateAuthUI();
+
+                    // 2. Controllo e semina dei dati (esegui solo dopo che auth è pronto)
+                    const recipesRef = collection(db, getRecipesCollectionPath());
+                    const initialSnapshot = await getDocs(recipesRef);
+                    if (initialSnapshot.empty) {
+                        await seedDatabase();
+                    }
+                    
+                    // 3. Avvia il listener in tempo reale (onSnapshot)
+                    onSnapshot(recipesRef, (snapshot) => {
+                        const fetchedRecipes = [];
+                        snapshot.forEach((doc) => {
+                            fetchedRecipes.push({ id: doc.id, ...doc.data() });
+                        });
+                        // Ordina le ricette per data di creazione (più recenti in cima)
+                        fetchedRecipes.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                        
+                        recipes = fetchedRecipes; // Aggiorna la cache
+                        renderRecipes(recipes); // Ridisegna la UI
+                    }, (error) => {
+                        console.error("Errore onSnapshot (Firestore):", error);
+                        showFeedback('Errore di connessione al database.', true);
+                        document.getElementById('recipe-list').innerHTML = `<p class="text-red-500 col-span-full p-4">Impossibile caricare le ricette: ${error.message}</p>`;
+                    });
+                });
+
+                // Imposta il filtro predefinito
+                setFilter('All');
+
+            } catch (error) {
+                console.error("Errore fatale nell'inizializzazione di Firebase:", error);
+                document.getElementById('auth-controls').innerHTML = `<span class="text-sm text-red-600">Errore: Configurazione Firebase non valida.</span>`;
+            }
+        };
+    </script>
+</body>
+</html>
