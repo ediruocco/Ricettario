@@ -774,6 +774,21 @@
             }).filter(ing => ing.nome.length > 0);
         }
 
+        /**
+         * Divide un testo in frasi (sentence-splitting) restituendo un array di frasi pulite.
+         * Usa un approccio robusto che considera punti esclamativi/interrogativi e nuove linee.
+         * @param {string} text
+         * @returns {string[]}
+         */
+        function splitIntoSentences(text) {
+            if (!text || typeof text !== 'string') return [];
+            // Normalizza gli spazi e preserva nuove linee come possibili separatori
+            const normalized = text.replace(/\r\n|\r/g, '\n').replace(/\s+/g, ' ').trim();
+            // Matcha blocchi terminati eventualmente da .,!? o fine riga
+            const matches = normalized.match(/[^\n.!?]+[.!?]?/g) || [];
+            return matches.map(s => s.trim()).filter(s => s.length > 0);
+        }
+
         const initialRecipes = [
             {
                 name: "Pasta al Pesto",
@@ -930,19 +945,15 @@
             }
             
             // 2. Genera l'HTML per le istruzioni come testo continuo e responsive (non elenco)
-            const instructionsArray = recipe.instructions
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0);
-
+            // Converti il testo delle istruzioni in frasi e presentale come elenco puntato
+            const instructionSentences = splitIntoSentences(recipe.instructions);
             let instructionsListHtml = '';
 
-            if (instructionsArray.length > 0) {
-                // Le istruzioni sono visualizzate come testo fluido e responsive, con minore distanza dal bordo superiore
+            if (instructionSentences.length > 0) {
                 instructionsListHtml = `
-                    <div class="text-gray-700 text-base sm:text-lg break-words leading-relaxed mt-0" style="text-align:justify;">
-                    ${instructionsArray.join(' ')}
-                    </div>
+                    <ul class="list-disc pl-5 space-y-2 text-gray-700 text-base sm:text-lg leading-relaxed" style="text-align:justify;">
+                        ${instructionSentences.map(s => `<li class="instruction-step">${s}</li>`).join('')}
+                    </ul>
                 `;
             } else {
                 instructionsListHtml = `<p class="text-gray-500 italic">Nessuna istruzione fornita.</p>`;
@@ -1040,12 +1051,13 @@
             });
             ingredientsHtml += '</ul>';
             
-            const instructionsArray = recipe.instructions.split('\n').filter(line => line.trim() !== '');
-            let instructionsHtml = '<ol style="padding-left: 20px; margin: 0; list-style-type: decimal;">';
-            instructionsArray.forEach(step => {
-                instructionsHtml += `<li style="margin-bottom: 10px; font-size: 16px; color: #374151;">${step.trim()}</li>`;
+            // Split into sentences and render as a bulleted list so long instructions flow naturally across pages
+            const instructionSentences = splitIntoSentences(recipe.instructions);
+            let instructionsHtml = '<ul style="padding-left: 20px; margin: 0; list-style-type: disc;">';
+            instructionSentences.forEach(step => {
+                instructionsHtml += `<li class="instruction-step" style="margin-bottom: 10px; font-size: 16px; color: #374151;">${step}</li>`;
             });
-            instructionsHtml += '</ol>';
+            instructionsHtml += '</ul>';
 
             // 2. Inietta l'HTML
             pdfContainer.innerHTML = `
@@ -1155,17 +1167,35 @@
             const contentWidth = contentElement.offsetWidth || pdfContainer.clientWidth || 760;
 
             const options = {
-                margin: [6,8,6,8], // tighter margins
+                margin: [6,8,6,8], // tighter margins (top,right,bottom,left) in mm
                 filename: `${recipe.name.replace(/\s/g, '_')}_Ricetta.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
+                // html2canvas: keep scale limited to avoid huge canvases on mobile
                 html2canvas: { scale: canvasScale, logging: false, useCORS: true, backgroundColor: '#ffffff', letterRendering: true, width: contentWidth },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                // Page break options: allow html2pdf to split long content using CSS rules
+                pagebreak: { mode: ['css', 'legacy'] }
             };
 
             // Inject a small CSS reset inside the pdf content to remove default margins and reduce top spacing
             try {
                 const styleReset = document.createElement('style');
-                styleReset.innerHTML = `html,body{margin:0;padding:0;background:#fff} #pdf-document-content{box-sizing:border-box;padding-top:8px;padding-left:12px;padding-right:12px;padding-bottom:10px} #pdf-document-content h1{margin-top:0;margin-bottom:6px}`;
+                // Inject @page and break rules to encourage correct multi-page splitting
+                styleReset.innerHTML = `
+                    @page { size: A4; margin: 10mm; }
+                    html,body{margin:0;padding:0;background:#fff}
+                    /* Ensure pdf content uses box sizing and compact paddings */
+                    #pdf-document-content{box-sizing:border-box;padding-top:8px;padding-left:12px;padding-right:12px;padding-bottom:10px}
+                    #pdf-document-content h1{margin-top:0;margin-bottom:6px}
+                    /* Avoid forcing break-inside on every element; target big blocks */
+                    #pdf-document-content h1, #pdf-document-content h2, #pdf-document-content .ingredients-list, #pdf-document-content ol, #pdf-document-content ul, #pdf-document-content table{page-break-inside: avoid; break-inside: avoid-column;}
+                    /* Allow paragraphs and list items to flow across pages */
+                    #pdf-document-content p, #pdf-document-content li, #pdf-document-content .instruction-step{page-break-inside: auto; break-inside: auto;}
+                    /* Images should not be split */
+                    #pdf-document-content img{max-width:100%;height:auto;page-break-inside: avoid;}
+                    /* Helper class for explicit page break if needed */
+                    .page-break{page-break-after: always; break-after: page;}
+                `;
                 contentElement.insertBefore(styleReset, contentElement.firstChild);
             } catch (e) {
                 // ignore
