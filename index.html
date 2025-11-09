@@ -64,10 +64,11 @@
             position: absolute; 
             left: -9999px; /* Spostato molto fuori dallo schermo */
             top: 0;
-            width: 800px; /* Larghezza fissa per la formattazione A4 */
+            width: 760px; /* Larghezza fissa per la formattazione A4 (ridotta per evitare clipping) */
             height: auto;
             background-color: white;
             z-index: -10; 
+            box-sizing: border-box;
         }
         
         /* La classe per rendere il body non scrollabile durante la preparazione del PDF */
@@ -1013,7 +1014,7 @@
          * nel viewport (top:0, left:0) ma con opacità 0.
          * @param {string} recipeId L'ID della ricetta da scaricare.
          */
-        window.generateRecipePdf = (recipeId) => {
+        window.generateRecipePdf = async (recipeId) => {
             const recipe = recipes.find(r => r.id === recipeId);
 
             if (!recipe) {
@@ -1049,7 +1050,7 @@
 
             // 2. Inietta l'HTML
             pdfContainer.innerHTML = `
-                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 100%;">
+                <div id="pdf-document-content" style="padding: 12px 16px; border: 2px solid ${typeColor}; border-radius: 8px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.08); width: 100%; box-sizing: border-box;">
                     <h1 style="font-size: 32px; font-weight: bold; color: #1f2937; margin-bottom: 5px; text-align: center;">${recipe.name}</h1>
                     <div style="margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                         <span style="background-color: ${typeBg}; color: ${typeColor}; padding: 4px 12px; border-radius: 9999px; font-size: 14px; font-weight: 600;">
@@ -1068,52 +1069,129 @@
                 </div>
             `;
             
-            // 3. Modifica gli stili per forzare il rendering in un contenitore nascosto ma nel viewport
+            // 3. Modifica gli stili per forzare il rendering completo in un contenitore nel viewport
             const originalStyles = {
                 position: pdfContainer.style.position,
                 left: pdfContainer.style.left,
+                top: pdfContainer.style.top,
                 opacity: pdfContainer.style.opacity,
                 zIndex: pdfContainer.style.zIndex,
+                width: pdfContainer.style.width
             };
 
-            // Imposta stili temporanei per forzare il rendering completo
-            pdfContainer.style.position = 'fixed'; 
+            // Posiziona il container nel viewport ma invisibile (non display:none)
+            pdfContainer.style.position = 'fixed';
             pdfContainer.style.top = '0';
-            pdfContainer.style.left = '0'; // Nel viewport
-            pdfContainer.style.opacity = '0'; // Invisibile
-            pdfContainer.style.zIndex = '9999'; // Sopra tutto
+            pdfContainer.style.left = '0';
+            pdfContainer.style.opacity = '0';
+            pdfContainer.style.zIndex = '9999';
+            // Ensure width matches styling for consistent layout
+            pdfContainer.style.width = pdfContainer.classList.contains('pdf-content-container') ? '760px' : pdfContainer.style.width || '760px';
             body.classList.add('is-preparing-pdf'); // Blocca lo scrolling del body
 
             const contentElement = pdfContainer.querySelector('#pdf-document-content');
-            
-            // 4. Opzioni di configurazione per html2pdf
+
+            // Helper: wait for fonts and images to load inside contentElement
+            const waitForResources = async (el, timeout = 2000) => {
+                try {
+                    // Wait for fonts (if supported)
+                    if (document.fonts && document.fonts.ready) {
+                        await document.fonts.ready;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+
+                const imgs = Array.from(el.querySelectorAll('img'));
+                await Promise.all(imgs.map(img => {
+                    return new Promise(resolve => {
+                        if (img.complete && img.naturalWidth !== 0) return resolve();
+                        const t = setTimeout(() => resolve(), timeout);
+                        img.onload = img.onerror = () => { clearTimeout(t); resolve(); };
+                        // try decode if available
+                        if (img.decode) {
+                            img.decode().then(() => { clearTimeout(t); resolve(); }).catch(() => {});
+                        }
+                    });
+                }));
+
+                // small delay to allow layout to stabilize
+                await new Promise(r => setTimeout(r, 250));
+            };
+
+            // Validate content element
+            if (!contentElement) {
+                console.error('generateRecipePdf: content element non trovato');
+                showFeedback('Errore interno: impossibile generare PDF.', true);
+                // restore
+                pdfContainer.innerHTML = '';
+                pdfContainer.style.position = originalStyles.position;
+                pdfContainer.style.left = originalStyles.left;
+                pdfContainer.style.top = originalStyles.top;
+                pdfContainer.style.opacity = originalStyles.opacity;
+                pdfContainer.style.zIndex = originalStyles.zIndex;
+                pdfContainer.style.width = originalStyles.width;
+                body.classList.remove('is-preparing-pdf');
+                return;
+            }
+
+            // Wait for resources and reflow
+            try {
+                // Ensure window is at top to avoid capture offsets
+                try { window.scrollTo(0,0); } catch(e) {}
+
+                await waitForResources(contentElement, 3000);
+                // Force reflow
+                contentElement.getBoundingClientRect();
+            } catch (e) {
+                console.warn('Warning while waiting for resources:', e);
+            }
+
+            // Decide an appropriate scale for html2canvas (avoid too large scales on mobile)
+            const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
+            const canvasScale = Math.max(1, deviceRatio);
+
+            // 4. Opzioni di configurazione per html2pdf (tuned for reliability)
+            // Try to explicitly set html2canvas width to match the content element to avoid unexpected scaling
+            const contentWidth = contentElement.offsetWidth || pdfContainer.clientWidth || 760;
+
             const options = {
-                margin: 10,
+                margin: [6,8,6,8], // tighter margins
                 filename: `${recipe.name.replace(/\s/g, '_')}_Ricetta.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                // Utilizza un'alta risoluzione per il canvas
-                html2canvas: { scale: 3, logging: false, dpi: 192, letterRendering: true, useCORS: true }, 
+                html2canvas: { scale: canvasScale, logging: false, useCORS: true, backgroundColor: '#ffffff', letterRendering: true, width: contentWidth },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
-            
-            // 5. Genera il PDF
-            html2pdf().from(contentElement).set(options).save()
-                .then(() => {
-                    showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
-                })
-                .catch(error => {
-                    console.error('Errore durante la generazione del PDF:', error);
-                    showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
-                })
-                .finally(() => {
-                    // 6. Pulisce e ripristina gli stili originali
-                    pdfContainer.innerHTML = ''; 
-                    pdfContainer.style.position = originalStyles.position;
-                    pdfContainer.style.left = originalStyles.left;
-                    pdfContainer.style.opacity = originalStyles.opacity;
-                    pdfContainer.style.zIndex = originalStyles.zIndex;
-                    body.classList.remove('is-preparing-pdf');
-                });
+
+            // Inject a small CSS reset inside the pdf content to remove default margins and reduce top spacing
+            try {
+                const styleReset = document.createElement('style');
+                styleReset.innerHTML = `html,body{margin:0;padding:0;background:#fff} #pdf-document-content{box-sizing:border-box;padding-top:8px;padding-left:12px;padding-right:12px;padding-bottom:10px} #pdf-document-content h1{margin-top:0;margin-bottom:6px}`;
+                contentElement.insertBefore(styleReset, contentElement.firstChild);
+            } catch (e) {
+                // ignore
+            }
+
+            // 5. Genera il PDF in modo robusto
+            try {
+                // Ensure the element has layout before rendering
+                await new Promise(r => requestAnimationFrame(r));
+                await html2pdf().from(contentElement).set(options).save();
+                showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
+            } catch (error) {
+                console.error('Errore durante la generazione del PDF:', error);
+                showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
+            } finally {
+                // 6. Pulisce e ripristina gli stili originali
+                pdfContainer.innerHTML = '';
+                pdfContainer.style.position = originalStyles.position;
+                pdfContainer.style.left = originalStyles.left;
+                pdfContainer.style.top = originalStyles.top;
+                pdfContainer.style.opacity = originalStyles.opacity;
+                pdfContainer.style.zIndex = originalStyles.zIndex;
+                pdfContainer.style.width = originalStyles.width;
+                body.classList.remove('is-preparing-pdf');
+            }
         };
 
         // --- RECIPE RENDERING & FILTERING (omissis) ---
