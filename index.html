@@ -14,7 +14,14 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #FAF7F2; /* Sfondo crema/lino per un effetto ricettario */
+            background-image: url('./background.jpg'); /* Immagine di sfondo per un effetto visivo, con URL di fallback */
+            background-size: cover; /* L'immagine di sfondo copre l'intera area del contenitore */
+            background-position: center; /* Centra l'immagine di sfondo */
+            /*background-blend-mode: overlay; /* Miscela l'immagine di sfondo con il colore di sfondo, creando un effetto overlay */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
+
         .recipe-card {
             transition: all 0.3s ease;
             cursor: pointer; /* Indica che è cliccabile */
@@ -78,6 +85,13 @@
                  padding: 3rem; /* Padding maggiore su desktop */
             }
         }
+
+            /* Disabilita background-attachment:fixed sui dispositivi mobili per migliori prestazioni */
+        @media (max-width: 768px) {
+           body {
+               background-attachment: scroll;
+            }
+        }
         
     </style>
 </head>
@@ -99,6 +113,8 @@
 
     <!-- Contenitore Principale -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+
+        
         
         <!-- Controlli di Filtro e Ricerca (REPSONSIVE OPTIMIZED) -->
         <div class="bg-amber-100 p-4 sm:p-6 rounded-xl shadow-lg mb-6 sm:mb-8 flex flex-col space-y-3 md:space-y-0 md:flex-row md:space-x-4 border border-amber-200">
@@ -135,10 +151,13 @@
         <div id="feedback-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
     </main>
 
-    <!-- FOOTER AGGIORNATO: Contiene solo la dicitura -->
+    <!-- NUOVO FOOTER -->
     <footer class="bg-amber-50 shadow-sm border-t border-amber-200 mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
-            <p class="text-xs sm:text-sm text-green-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row justify-center items-center text-center space-y-4 md:space-y-0">
+            
+          
+            <!-- Elemento 1: Dicitura -->
+            <p class="text-xs sm:text-sm text-green-600 md:text-center">
                 © Questo progetto contiene codice generato con l'assistenza di Google Gemini 2.5 Flash.<br>
                 Le parti generate da AI sono state revisionate, modificate ed integrate da Ernesto Di Ruocco.
             </p>
@@ -951,11 +970,10 @@
             showModal('detail-modal');
         };
 
-        // --- PDF GENERATION LOGIC (FIXED) ---
+        // --- PDF GENERATION LOGIC (omissis) ---
 
         /**
          * Genera e scarica il PDF della ricetta dato il suo ID.
-         * Corretto con un setTimeout per evitare il clipping del contenuto su mobile.
          * @param {string} recipeId L'ID della ricetta da scaricare.
          */
         window.generateRecipePdf = (recipeId) => {
@@ -997,7 +1015,7 @@
 
             // 3. Inietta l'HTML nel contenitore nascosto
             pdfContainer.innerHTML = `
-                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 100%;">
+                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
                     <h1 style="font-size: 32px; font-weight: bold; color: #1f2937; margin-bottom: 5px; text-align: center;">${recipe.name}</h1>
                     <div style="margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                         <span style="background-color: ${typeBg}; color: ${typeColor}; padding: 4px 12px; border-radius: 9999px; font-size: 14px; font-weight: 600;">
@@ -1021,28 +1039,21 @@
                 margin: 10,
                 filename: `${recipe.name.replace(/\s/g, '_')}_Ricetta.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                // Aumento lo scale per una maggiore risoluzione del canvas (utile su mobile)
-                html2canvas: { scale: 3, logging: false, dpi: 192, letterRendering: true, useCORS: true }, 
+                html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true, useCORS: true },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
-            
-            // 5. Utilizza setTimeout per dare al browser un attimo per calcolare l'altezza esatta
-            setTimeout(() => {
-                 // Usa il contenuto interno come sorgente per garantire che le dimensioni siano calcolate correttamente
-                 const contentElement = pdfContainer.querySelector('#pdf-document-content');
-                 
-                 html2pdf().from(contentElement).set(options).save()
-                    .then(() => {
-                        showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
-                        pdfContainer.innerHTML = ''; // Pulisce il contenitore nascosto
-                    })
-                    .catch(error => {
-                        console.error('Errore durante la generazione del PDF:', error);
-                        showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
-                        pdfContainer.innerHTML = '';
-                    });
-            }, 5000); // Un breve ritardo di 500ms per stabilizzare il rendering
 
+            // 5. Genera e scarica il PDF
+            html2pdf().from(pdfContainer.querySelector('#pdf-document-content')).set(options).save()
+                .then(() => {
+                    showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
+                    pdfContainer.innerHTML = ''; // Pulisce il contenitore nascosto
+                })
+                .catch(error => {
+                    console.error('Errore durante la generazione del PDF:', error);
+                    showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
+                    pdfContainer.innerHTML = '';
+                });
         };
 
         // --- RECIPE RENDERING & FILTERING (omissis) ---
@@ -1160,9 +1171,7 @@
                 recipeCard.innerHTML = `
                     <div>
                         <div class="flex items-center justify-between mb-3">
-                            <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">
-                                ${recipe.type}
-                            </span>
+                            <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">${recipe.type}</span>
                             <p class="text-xs text-gray-500">di <span class="font-semibold text-gray-700">${recipe.userName}</span></p>
                         </div>
                         
