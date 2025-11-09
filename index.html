@@ -924,20 +924,23 @@
                 `;
             }
             
-            // 2. Genera l'HTML per le istruzioni come elenco ordinato
-            const instructionsArray = recipe.instructions.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+            // 2. Genera l'HTML per le istruzioni come testo continuo e responsive (non elenco)
+            const instructionsArray = recipe.instructions
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+
             let instructionsListHtml = '';
+
             if (instructionsArray.length > 0) {
-                // Utilizza classi Tailwind per uno stile di lista ordinata pulito
+                // Le istruzioni sono visualizzate come testo fluido e responsive, con minore distanza dal bordo superiore
                 instructionsListHtml = `
-                    <ol class="list-decimal list-inside space-y-4 text-gray-700 text-base sm:text-lg">
-                        ${instructionsArray.map(step => `
-                            <li class="pl-2 leading-relaxed">${step}</li>
-                        `).join('')}
-                    </ol>
+                    <div class="text-gray-700 text-base sm:text-lg break-words leading-relaxed mt-0 ">
+                    ${instructionsArray.join(' ')}
+                    </div>
                 `;
             } else {
-                instructionsListHtml = `<p class="text-gray-500 italic">Nessuna istruzione fornita.</p>`;
+            instructionsListHtml = `<p class="text-gray-500 italic">Nessuna istruzione fornita.</p>`;
             }
 
 
@@ -1215,7 +1218,7 @@
                         </div>
                     `;
                 }
-
+                
                 // Per Modifica/Elimina, dobbiamo passare l'oggetto completo, quindi lo serializziamo qui
                 const recipeJsonString = JSON.stringify(recipe).replace(/"/g, '&quot;');
 
