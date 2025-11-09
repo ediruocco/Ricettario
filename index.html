@@ -201,7 +201,7 @@
                 Non hai un account? Registrati qui.
             </button>
             
-            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'auth-modal')">
+            <button class="absolute top-4 right-6 sm:right-8 text-red-600 hover:text-red-800 z-50 bg-white rounded-full p-1 shadow ring-1 ring-gray-100" onclick="closeModal(null, 'auth-modal')" aria-label="Chiudi modale">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -233,7 +233,7 @@
 
             <div id="account-error" class="text-red-600 text-sm mt-4 hidden"></div>
 
-            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'account-modal')">
+            <button class="absolute top-4 right-6 sm:right-8 text-red-600 hover:text-red-800 z-50 bg-white rounded-full p-1 shadow ring-1 ring-gray-100" onclick="closeModal(null, 'account-modal')" aria-label="Chiudi modale">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -281,7 +281,7 @@
                     Salva Ricetta
                 </button>
             </form>
-            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'recipe-modal')">
+            <button class="absolute top-4 right-6 sm:right-8 text-red-600 hover:text-red-800 z-50 bg-white rounded-full p-1 shadow ring-1 ring-gray-100" onclick="closeModal(null, 'recipe-modal')" aria-label="Chiudi modale">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -305,7 +305,7 @@
     <div id="detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-0 sm:p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'detail-modal')">
         <div class="modal-content bg-white rounded-none sm:rounded-xl shadow-2xl p-6 sm:p-8 lg:p-12" onclick="event.stopPropagation()">
             
-            <button class="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 z-10" onclick="closeModal(null, 'detail-modal')">
+            <button class="absolute top-3 right-6 sm:top-4 sm:right-8 text-red-600 hover:text-red-800 z-50 bg-white rounded-full p-1 shadow ring-1 ring-gray-100" onclick="closeModal(null, 'detail-modal')" aria-label="Chiudi dettaglio">
                 <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
 
@@ -751,21 +751,26 @@
         // --- FIRESTORE DATA LOGIC (omissis) ---
 
         function parseIngredients(ingredientsText) {
+            // Split only by newline or comma to get ingredient lines
             const lines = ingredientsText.split(/[\n,]/).map(line => line.trim()).filter(line => line.length > 0);
+
+            // Each line must use '-' as the only separator between name and quantity
             return lines.map(line => {
-                const parts = line.split(/[-:\s]{1,}/).map(p => p.trim()).filter(p => p.length > 0);
-                let nome = parts[0] || '';
-                let quantita = parts[1] || 'q.b.';
-                
-                if (parts.length > 2) {
-                    quantita = parts[parts.length - 1];
-                    nome = parts.slice(0, parts.length - 1).join(' ');
-                } else if (parts.length === 1) {
-                    nome = parts[0];
+                // Split on the first '-' only to allow '-' inside the name if necessary
+                const dashIndex = line.indexOf('-');
+                let nome = '';
+                let quantita = 'q.b.';
+
+                if (dashIndex !== -1) {
+                    nome = line.slice(0, dashIndex).trim();
+                    quantita = line.slice(dashIndex + 1).trim() || 'q.b.';
+                } else {
+                    // No dash found -> treat whole line as ingredient name, default quantity
+                    nome = line.trim();
                     quantita = 'q.b.';
                 }
-                
-                return { nome: nome.trim(), quantita: quantita.trim() };
+
+                return { nome: nome, quantita: quantita };
             }).filter(ing => ing.nome.length > 0);
         }
 
@@ -935,12 +940,12 @@
             if (instructionsArray.length > 0) {
                 // Le istruzioni sono visualizzate come testo fluido e responsive, con minore distanza dal bordo superiore
                 instructionsListHtml = `
-                    <div class="text-gray-700 text-base sm:text-lg break-words leading-relaxed mt-0 ">
+                    <div class="text-gray-700 text-base sm:text-lg break-words leading-relaxed mt-0" style="text-align:justify;">
                     ${instructionsArray.join(' ')}
                     </div>
                 `;
             } else {
-            instructionsListHtml = `<p class="text-gray-500 italic">Nessuna istruzione fornita.</p>`;
+                instructionsListHtml = `<p class="text-gray-500 italic">Nessuna istruzione fornita.</p>`;
             }
 
 
@@ -1175,6 +1180,11 @@
                 return;
             }
 
+            // Configurazioni per anteprima istruzioni (modificabili)
+            const PREVIEW_CHARS = 150; // prima parte visibile senza scroll
+            const SCROLL_CHARS = 300;  // fino a quanti caratteri sono accessibili con lo scroll
+            const SCROLL_MAX_HEIGHT = '5.5rem'; // max-height del blocco scrollabile (ridotto di ~1 riga)
+
             filteredList.forEach(recipe => {
                 const recipeId = recipe.id;
                 
@@ -1214,11 +1224,41 @@
                                     <span class="text-right font-medium text-gray-600">${ing.quantita || 'q.b.'}</span>
                                 </div>
                             `).join('')}
-                            ${recipe.ingredients.length > 10 ? '<p class="text-xs text-center pt-1 text-gray-500">... Altri ingredienti ...</p>' : ''}
+                            ${recipe.ingredients.length > 5 ? '<p class="text-xs text-center pt-1 text-gray-500">... Altri ingredienti ...</p>' : ''}
                         </div>
                     `;
                 }
                 
+                // Costruisce la versione compatta delle istruzioni per la card
+                const instructionsText = (recipe.instructions && typeof recipe.instructions === 'string') ? recipe.instructions.trim() : '';
+                const instructionsFragments = instructionsText.length > 0 ? instructionsText.split('\n').map(l => l.trim()).filter(l => l.length > 0) : [];
+
+                const fullLen = instructionsText.length;
+                const needsMore = fullLen > SCROLL_CHARS; // indicator if more than SCROLL_CHARS chars
+
+                let instructionsCompactHtml = '';
+                if (fullLen > 0) {
+                    // Single scrollable block containing up to SCROLL_CHARS chars.
+                    const blockContent = instructionsText.slice(0, Math.min(fullLen, SCROLL_CHARS));
+                    const blockHtml = blockContent.replace(/\n/g, '<br>');
+                    // Only show the gradient overlay if there's content beyond the preview threshold (PREVIEW_CHARS)
+                    const showOverlay = fullLen > PREVIEW_CHARS;
+                    const overlayHtml = showOverlay ? '<div style="pointer-events:none; position:absolute; left:0; right:0; bottom:0; height:1.4rem; background: linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0));"></div>' : '';
+                    // Use a relative wrapper so we can optionally add a small gradient overlay at the bottom to hint scrollability.
+                    instructionsCompactHtml = `
+                        <div class="relative">
+                            <div class="text-gray-600 text-sm overflow-y-auto pr-2" style="max-height:${SCROLL_MAX_HEIGHT}; text-align:justify;">${blockHtml}</div>
+                            ${overlayHtml}
+                        </div>
+                    `;
+
+                    if (needsMore) {
+                        instructionsCompactHtml += '<p class="text-xs text-center pt-1 text-gray-500">... Altre istruzioni ...</p>';
+                    }
+                } else {
+                    instructionsCompactHtml = `<p class="text-gray-500 italic">Nessuna istruzione fornita.</p>`;
+                }
+
                 // Per Modifica/Elimina, dobbiamo passare l'oggetto completo, quindi lo serializziamo qui
                 const recipeJsonString = JSON.stringify(recipe).replace(/"/g, '&quot;');
 
@@ -1239,9 +1279,9 @@
                             ${ingredientsListHtml}
                         </div>
                         <div class="mb-4">
-                            <h4 class="text-md font-semibold text-gray-800 mb-1">Procedimento:</h4>
-                            <p class="text-gray-600 text-sm max-h-16 overflow-hidden">${recipe.instructions.substring(0, 150)}...</p>
-                        </div>
+                                    <h4 class="text-md font-semibold text-gray-800 mb-1">Procedimento:</h4>
+                                        ${instructionsCompactHtml}
+                                </div>
                     </div>
                     
                     <!-- Controlli PDF / Modifica / Elimina -->
