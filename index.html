@@ -33,6 +33,7 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
         /* Stile per il contenitore degli ingredienti per migliorarne la leggibilità */
         .ingredients-list {
             max-height: 120px; /* Altezza massima per l'elenco ingredienti */
@@ -65,15 +66,19 @@
         
         /* Stili specifici per il modale dettaglio a schermo intero */
         #detail-modal .modal-content {
-            width: 95%;
-            max-width: 900px; /* Limite la larghezza massima per una migliore lettura su desktop */
+            /* Responsive: Larghezza 95% su mobile, max 900px su desktop */
+            width: 95%; 
+            max-width: 900px; 
             max-height: 95%;
             overflow-y: auto;
+            padding: 1.5rem; /* Padding base per mobile */
         }
-        /* Stile per l'elenco istruzioni nel modale dettaglio */
-        #detail-instructions {
-            white-space: pre-wrap; /* Mantiene gli a capo e gli spazi */
+        @media (min-width: 1024px) { /* lg breakpoint */
+            #detail-modal .modal-content {
+                 padding: 3rem; /* Padding maggiore su desktop */
+            }
         }
+        
     </style>
 </head>
 <body>
@@ -81,10 +86,10 @@
     <!-- Intestazione (Header) -->
     <header class="bg-amber-50 shadow-sm sticky top-0 z-10 border-b border-amber-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-green-800">Il Mio Ricettario</h1>
-            <div class="flex items-center space-x-4"> 
+            <h1 class="text-2xl sm:text-3xl font-bold text-green-800">Il Mio Ricettario</h1>
+            <div class="flex items-center space-x-2 sm:space-x-4"> 
                 <!-- Pulsante Le Mie Ricette / Tutte le Ricette -->
-                <button id="my-recipes-toggle-btn" class="hidden font-semibold py-2 px-4 rounded-lg transition duration-150 text-sm whitespace-nowrap"></button>
+                <button id="my-recipes-toggle-btn" class="hidden font-semibold py-2 px-3 sm:px-4 rounded-lg transition duration-150 text-xs sm:text-sm whitespace-nowrap"></button>
                 <div id="auth-controls" class="flex space-x-3 items-center">
                     <div class="text-sm text-gray-500">Caricamento stato...</div>
                 </div>
@@ -93,32 +98,31 @@
     </header>
 
     <!-- Contenitore Principale -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
-        <!-- Controlli di Filtro e Ricerca -->
-        <div class="bg-amber-100 p-6 rounded-xl shadow-lg mb-8 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 border border-amber-200">
+        <!-- Controlli di Filtro e Ricerca (REPSONSIVE OPTIMIZED) -->
+        <div class="bg-amber-100 p-4 sm:p-6 rounded-xl shadow-lg mb-6 sm:mb-8 flex flex-col space-y-3 md:space-y-0 md:flex-row md:space-x-4 border border-amber-200">
             
             <!-- Barra di Ricerca -->
-            <input type="text" id="search-input" placeholder="Cerca ricette per nome, ingrediente o istruzioni..."
-                   class="flex-grow p-3 border border-amber-300 rounded-lg focus:ring-green-700 focus:border-green-700 transition duration-150"
+            <input type="text" id="search-input" placeholder="Cerca ricette..."
+                   class="flex-grow p-3 border border-amber-300 rounded-lg focus:ring-green-700 focus:border-green-700 transition duration-150 text-sm"
                    oninput="filterRecipes()">
             
-            <!-- Filtri per Tipo -->
-            <div class="flex space-x-2">
-                <!-- Colori tematici per i filtri -->
-                <button data-filter="All" onclick="setFilter('All')" class="filter-btn bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-800 transition duration-150">Tutte</button>
-                <button data-filter="Salato" onclick="setFilter('Salato')" class="filter-btn bg-amber-200 text-green-800 font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-amber-300 transition duration-150">Salato</button>
-                <button data-filter="Dolce" onclick="setFilter('Dolce')" class="filter-btn bg-amber-200 text-green-800 font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-amber-300 transition duration-150">Dolce</button>
+            <!-- Filtri per Tipo: Usa flex-wrap per adattarsi meglio su mobile -->
+            <div class="flex space-x-2 justify-center">
+                <button data-filter="All" onclick="setFilter('All')" class="filter-btn bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-800 transition duration-150 text-sm">Tutte</button>
+                <button data-filter="Salato" onclick="setFilter('Salato')" class="filter-btn bg-amber-200 text-green-800 font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-amber-300 transition duration-150 text-sm">Salato</button>
+                <button data-filter="Dolce" onclick="setFilter('Dolce')" class="filter-btn bg-amber-200 text-green-800 font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-amber-300 transition duration-150 text-sm">Dolce</button>
             </div>
 
             <!-- Pulsante Aggiungi Ricetta (visibile solo se autenticato) -->
-            <button id="add-recipe-btn" class="hidden bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-orange-700 transition duration-150" onclick="showModal('recipe-modal')">
+            <button id="add-recipe-btn" class="hidden bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 text-sm" onclick="showModal('recipe-modal')">
                 Aggiungi Ricetta
             </button>
         </div>
 
         <!-- Lista Ricette -->
-        <div id="recipe-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div id="recipe-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Le card delle ricette verranno iniettate qui -->
             <p class="text-gray-500 col-span-full">Caricamento ricette...</p>
         </div>
@@ -131,10 +135,21 @@
         <div id="feedback-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
     </main>
 
+    <!-- FOOTER AGGIORNATO: Contiene solo la dicitura -->
+    <footer class="bg-amber-50 shadow-sm border-t border-amber-200 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+            <p class="text-xs sm:text-sm text-green-600">
+                © Questo progetto contiene codice generato con l'assistenza di Google Gemini 2.5 Flash.<br>
+                Le parti generate da AI sono state revisionate, modificate ed integrate da Ernesto Di Ruocco.
+            </p>
+        </div>
+    </footer>
+
+
     <!-- 1. Modale di Autenticazione (Accesso/Registrazione) -->
     <div id="auth-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'auth-modal')">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-8" onclick="event.stopPropagation()">
-            <h2 id="auth-title" class="text-2xl font-bold mb-6 text-gray-800">Accedi</h2>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md p-6 sm:p-8" onclick="event.stopPropagation()">
+            <h2 id="auth-title" class="text-xl sm:text-2xl font-bold mb-6 text-gray-800">Accedi</h2>
             <form id="auth-form" onsubmit="handleAuth(event)">
                 <div class="mb-4" id="username-field" style="display: none;">
                     <label for="auth-username" class="block text-sm font-medium text-gray-700">Nome Utente</label>
@@ -151,17 +166,17 @@
                 </div>
                 <div id="auth-error" class="text-red-600 text-sm mb-4 hidden"></div>
                 
-                <button type="submit" id="auth-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 flex items-center justify-center">
+                <button type="submit" id="auth-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 flex items-center justify-center text-sm sm:text-base">
                     <span id="auth-btn-text">Accedi</span>
                     <div id="auth-spinner" class="spinner w-5 h-5 border-2 border-white border-solid rounded-full ml-2 hidden"></div>
                 </button>
             </form>
 
-            <button class="w-full mt-4 text-sm text-gray-500 hover:text-orange-600 transition duration-150" onclick="showAccountModal('reset')">
+            <button class="w-full mt-4 text-xs sm:text-sm text-gray-500 hover:text-orange-600 transition duration-150" onclick="showAccountModal('reset')">
                 Password dimenticata?
             </button>
             
-            <button id="toggle-auth-btn" class="w-full mt-2 text-sm text-orange-600 hover:text-orange-800 transition duration-150" onclick="toggleAuthMode()">
+            <button id="toggle-auth-btn" class="w-full mt-2 text-xs sm:text-sm text-orange-600 hover:text-orange-800 transition duration-150" onclick="toggleAuthMode()">
                 Non hai un account? Registrati qui.
             </button>
             
@@ -173,13 +188,13 @@
 
     <!-- NUOVO MODALE: Gestione Account (Reimposta Password / Aggiorna Email) -->
     <div id="account-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'account-modal')">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-8" onclick="event.stopPropagation()">
-            <h2 id="account-modal-title" class="text-2xl font-bold mb-6 text-gray-800"></h2>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md p-6 sm:p-8" onclick="event.stopPropagation()">
+            <h2 id="account-modal-title" class="text-xl sm:text-2xl font-bold mb-6 text-gray-800"></h2>
             
             <div id="reset-password-form" style="display: none;">
                 <p class="mb-4 text-gray-600 text-sm">Inserisci l'indirizzo email del tuo account. Ti invieremo un link per reimpostare la password.</p>
                 <input type="email" id="reset-email" placeholder="La tua Email" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 mb-4">
-                <button onclick="handlePasswordReset()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150">Invia link di reimpostazione</button>
+                <button onclick="handlePasswordReset()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 text-sm sm:text-base">Invia link di reimpostazione</button>
             </div>
 
             <div id="update-email-form" style="display: none;">
@@ -192,7 +207,7 @@
                     <label for="current-password-reauth" class="block text-sm font-medium text-gray-700">Password Attuale (per sicurezza)</label>
                     <input type="password" id="current-password-reauth" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
                 </div>
-                <button onclick="handleEmailUpdate()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150">Aggiorna Email</button>
+                <button onclick="handleEmailUpdate()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 text-sm sm:text-base">Aggiorna Email</button>
             </div>
 
             <div id="account-error" class="text-red-600 text-sm mt-4 hidden"></div>
@@ -206,8 +221,8 @@
 
     <!-- 2. Modale Aggiungi/Modifica Ricetta -->
     <div id="recipe-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'recipe-modal')">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl p-8" onclick="event.stopPropagation()">
-            <h2 id="recipe-modal-title" class="text-2xl font-bold mb-6 text-gray-800">Aggiungi Nuova Ricetta</h2>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm sm:max-w-xl p-6 sm:p-8" onclick="event.stopPropagation()">
+            <h2 id="recipe-modal-title" class="text-xl sm:text-2xl font-bold mb-6 text-gray-800">Aggiungi Nuova Ricetta</h2>
             <form id="recipe-form" onsubmit="handleRecipeSubmit(event)">
                 <input type="hidden" id="recipe-id">
                 
@@ -241,7 +256,7 @@
                     <textarea id="recipe-instructions" rows="6" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"></textarea>
                 </div>
 
-                <button type="submit" id="recipe-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150">
+                <button type="submit" id="recipe-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 text-sm sm:text-base">
                     Salva Ricetta
                 </button>
             </form>
@@ -253,44 +268,40 @@
 
     <!-- 3. Modale di Conferma Eliminazione -->
     <div id="delete-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'delete-modal')">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8" onclick="event.stopPropagation()">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs sm:max-w-sm p-6 sm:p-8" onclick="event.stopPropagation()">
             <h2 class="text-xl font-bold mb-4 text-gray-800">Conferma Eliminazione</h2>
-            <p class="mb-6 text-gray-600">Sei sicuro di voler eliminare la ricetta "<span id="delete-recipe-name" class="font-semibold"></span>"? Questa operazione è irreversibile.</p>
+            <p class="mb-6 text-gray-600 text-sm">Sei sicuro di voler eliminare la ricetta "<span id="delete-recipe-name" class="font-semibold"></span>"? Questa operazione è irreversibile.</p>
             <div class="flex justify-end space-x-4">
-                <button class="bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-400 transition" onclick="closeModal(null, 'delete-modal')">Annulla</button>
-                <button id="confirm-delete-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition" data-recipe-id="" onclick="confirmDeleteRecipe()">
+                <button class="bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-400 transition text-sm" onclick="closeModal(null, 'delete-modal')">Annulla</button>
+                <button id="confirm-delete-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition text-sm" data-recipe-id="" onclick="confirmDeleteRecipe()">
                     Elimina
                 </button>
             </div>
         </div>
     </div>
     
-    <!-- 4. NUOVO Modale Dettaglio Ricetta a Schermo Intero -->
-    <div id="detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'detail-modal')">
-        <div class="modal-content bg-white rounded-xl shadow-2xl p-8 lg:p-12" onclick="event.stopPropagation()">
+    <!-- 4. Modale Dettaglio Ricetta a Schermo Intero (RESPONSIVE OPTIMIZED) -->
+    <div id="detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-0 sm:p-4 z-50 opacity-0 invisible" onclick="closeModal(event, 'detail-modal')">
+        <div class="modal-content bg-white rounded-none sm:rounded-xl shadow-2xl p-6 sm:p-8 lg:p-12" onclick="event.stopPropagation()">
             
-            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onclick="closeModal(null, 'detail-modal')">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button class="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 z-10" onclick="closeModal(null, 'detail-modal')">
+                <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
 
             <div id="detail-content">
                 <!-- I dettagli della ricetta verranno iniettati qui -->
             </div>
             
-            <div class="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+            <div class="mt-6 pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
                  <!-- Pulsanti Azione (PDF e Modifica) -->
-                 <button id="detail-pdf-btn" onclick="" class="flex items-center space-x-2 text-sm bg-blue-500 text-white font-medium py-3 px-5 rounded-lg hover:bg-blue-600 transition shadow-md">
+                 <button id="detail-pdf-btn" onclick="" class="flex items-center justify-center space-x-2 text-sm bg-blue-500 text-white font-medium py-3 px-5 rounded-lg hover:bg-blue-600 transition shadow-md">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     Scarica PDF
                  </button>
-                 <button id="detail-edit-btn" onclick="" class="hidden text-sm bg-orange-600 text-white font-medium py-3 px-5 rounded-lg hover:bg-orange-700 transition shadow-md">
+                 <button id="detail-edit-btn" onclick="" class="hidden justify-center text-sm bg-orange-600 text-white font-medium py-3 px-5 rounded-lg hover:bg-orange-700 transition shadow-md">
                     Modifica Ricetta
                  </button>
             </div>
-        </div>
-         <div class="footer">
-            <p>Ricettario</p>
-            <p class="ai-attribution">© Questo progetto contiene codice generato con l'assistenza di Google Gemini 2.5 Flash. Le parti generate da AI sono state revisionate, modificate ed integrate da Ernesto Di Ruocco.</p>
         </div>
     </div>
 
@@ -585,13 +596,13 @@
                             <span class="text-sm font-semibold text-gray-700">Ciao, ${displayUser}</span>
                             <button onclick="showAccountModal('update')" class="text-xs text-blue-500 hover:text-blue-700 mt-0.5">Gestisci Account</button>
                         </div>
-                        <button onclick="logoutUser()" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition">Logout</button>
+                        <button onclick="logoutUser()" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition text-sm">Logout</button>
                     `;
                     addRecipeBtn.classList.remove('hidden');
                 } else {
                     // Utente Sconosciuto / Anonimo
                     authControls.innerHTML = `
-                        <button onclick="showModal('auth-modal')" class="bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-700 transition">Accedi / Registrati</button>
+                        <button onclick="showModal('auth-modal')" class="bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-700 transition text-sm">Accedi / Registrati</button>
                     `;
                     addRecipeBtn.classList.add('hidden');
                     userName = null;
@@ -722,7 +733,7 @@
                     { nome: "Pinoli", quantita: "q.b." },
                     { nome: "Parmigiano Reggiano", quantita: "50gr" }
                 ],
-                instructions: "Cuoci la pasta in abbondante acqua salata. Nel frattempo, scalda leggermente il pesto se necessario. Scola la pasta al dente e versala direttamente nella ciotola con il pesto. Mescola bene. Servi immediatamente con pinoli tostati e scaglie di parmigiano Reggiano.",
+                instructions: "Cuoci la pasta in abbondante acqua salata.\nScola la pasta al dente.\nVersa la pasta direttamente nella ciotola con il pesto e mescola bene.\nServi immediatamente con pinoli tostati e scaglie di parmigiano Reggiano.",
                 userId: 'seed-user',
                 userName: 'ChefDemo'
             },
@@ -737,7 +748,7 @@
                     { nome: "Caffè espresso", quantita: "200ml" },
                     { nome: "Cacao amaro", quantita: "q.b." }
                 ],
-                instructions: "Prepara il caffè e lascialo raffreddare. In una ciotola, monta i tuorli con lo zucchero fino a ottenere un composto chiaro e spumoso. Aggiungi il mascarpone e mescola delicatamente. Assembla: intingi velocemente i savoiardi nel caffè e disponi un primo strato in una pirofila. Copri con uno strato di crema al mascarpone. Ripeti l'operazione per un secondo strato. Concludi spolverando abbondantemente con cacao amaro. Lascia riposare in frigorifero per almeno 4 ore prima di servire.",
+                instructions: "Prepara il caffè e lascialo raffreddare.\nIn una ciotola, monta i tuorli con lo zucchero fino a ottenere un composto chiaro e spumoso.\nAggiungi il mascarpone e mescola delicatamente.\nIntingi velocemente i savoiardi nel caffè e disponi un primo strato in una pirofila.\nCopri con uno strato di crema al mascarpone e ripeti l'operazione.\nConcludi spolverando abbondantemente con cacao amaro.\nLascia riposare in frigorifero per almeno 4 ore prima di servire.",
                 userId: 'seed-user',
                 userName: 'ChefDemo'
             }
@@ -832,7 +843,7 @@
             }
         };
 
-        // --- DETTAGLIO RICETTA (NUOVO) ---
+        // --- DETTAGLIO RICETTA (AGGIORNATO) ---
         
         /**
          * Mostra tutti i dettagli di una ricetta in un modale a schermo intero.
@@ -859,31 +870,48 @@
                     <div class="space-y-2">
                         ${recipe.ingredients.map(ing => `
                             <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                <span class="text-lg text-gray-800">${ing.nome || 'N/D'}</span>
-                                <span class="text-lg font-semibold text-${typeColorClass}">${ing.quantita || 'q.b.'}</span>
+                                <span class="text-base sm:text-lg text-gray-800">${ing.nome || 'N/D'}</span>
+                                <span class="text-base sm:text-lg font-semibold text-${typeColorClass}">${ing.quantita || 'q.b.'}</span>
                             </div>
                         `).join('')}
                     </div>
                 `;
             }
+            
+            // 2. Genera l'HTML per le istruzioni come elenco ordinato
+            const instructionsArray = recipe.instructions.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+            let instructionsListHtml = '';
+            if (instructionsArray.length > 0) {
+                // Utilizza classi Tailwind per uno stile di lista ordinata pulito
+                instructionsListHtml = `
+                    <ol class="list-decimal list-inside space-y-4 text-gray-700 text-base sm:text-lg">
+                        ${instructionsArray.map(step => `
+                            <li class="pl-2 leading-relaxed">${step}</li>
+                        `).join('')}
+                    </ol>
+                `;
+            } else {
+                instructionsListHtml = `<p class="text-gray-500 italic">Nessuna istruzione fornita.</p>`;
+            }
 
-            // 2. Inietta il contenuto nel modale
+
+            // 3. Inietta il contenuto nel modale
             detailContentEl.innerHTML = `
                 <div class="mb-6">
-                    <div class="flex items-center justify-between mb-2">
-                         <h1 class="text-4xl font-extrabold text-gray-900">${recipe.name}</h1>
-                         <span class="inline-block text-sm font-bold py-1 px-4 rounded-full text-white bg-${typeColorClass}">${recipe.type}</span>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2">
+                         <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2 sm:mb-0">${recipe.name}</h1>
+                         <span class="inline-block text-sm font-bold py-1 px-4 rounded-full text-white bg-${typeColorClass} whitespace-nowrap">${recipe.type}</span>
                     </div>
-                    <p class="text-md text-gray-500">
+                    <p class="text-sm sm:text-md text-gray-500">
                         di <span class="font-semibold text-gray-700">${recipe.userName}</span>
                     </p>
                 </div>
                 
-                <!-- Contenitore Principale -->
+                <!-- Contenitore Principale: Utilizza grid-cols-1 su mobile e grid-cols-2 da schermi grandi (lg) -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Ingredienti -->
                     <div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Ingredienti</h2>
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Ingredienti</h2>
                         <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
                             ${ingredientsListHtml}
                         </div>
@@ -891,15 +919,15 @@
 
                     <!-- Istruzioni -->
                     <div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Procedimento</h2>
-                        <p id="detail-instructions" class="text-gray-700 leading-relaxed">
-                            ${recipe.instructions}
-                        </p>
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Istruzioni</h2>
+                        <div class="bg-gray-50 p-4 sm:p-6 rounded-lg shadow-inner">
+                            ${instructionsListHtml}
+                        </div>
                     </div>
                 </div>
             `;
             
-            // 3. Collega i pulsanti di azione
+            // 4. Collega i pulsanti di azione
             detailPdfBtn.onclick = () => {
                 // Previene che il modale dettaglio chiuda il PDF.
                 closeModal(null, 'detail-modal'); 
@@ -919,14 +947,15 @@
             }
 
 
-            // 4. Mostra il modale
+            // 5. Mostra il modale
             showModal('detail-modal');
         };
 
-        // --- PDF GENERATION LOGIC (omissis) ---
+        // --- PDF GENERATION LOGIC (FIXED) ---
 
         /**
          * Genera e scarica il PDF della ricetta dato il suo ID.
+         * Corretto con un setTimeout per evitare il clipping del contenuto su mobile.
          * @param {string} recipeId L'ID della ricetta da scaricare.
          */
         window.generateRecipePdf = (recipeId) => {
@@ -957,7 +986,7 @@
             });
             ingredientsHtml += '</ul>';
             
-            // Le istruzioni vanno convertite in un elenco numerato e gestite le interruzioni di riga (con <br> o <p>)
+            // Le istruzioni vanno convertite in un elenco numerato
             const instructionsArray = recipe.instructions.split('\n').filter(line => line.trim() !== '');
             let instructionsHtml = '<ol style="padding-left: 20px; margin: 0; list-style-type: decimal;">';
             instructionsArray.forEach(step => {
@@ -967,9 +996,8 @@
 
 
             // 3. Inietta l'HTML nel contenitore nascosto
-            // IMPORTANTISSIMO: L'uso di white-space: pre-wrap è stato rimosso in quanto html2pdf lo gestisce male; abbiamo formattato con <ol> e <li>
             pdfContainer.innerHTML = `
-                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 100%;">
                     <h1 style="font-size: 32px; font-weight: bold; color: #1f2937; margin-bottom: 5px; text-align: center;">${recipe.name}</h1>
                     <div style="margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                         <span style="background-color: ${typeBg}; color: ${typeColor}; padding: 4px 12px; border-radius: 9999px; font-size: 14px; font-weight: 600;">
@@ -993,21 +1021,28 @@
                 margin: 10,
                 filename: `${recipe.name.replace(/\s/g, '_')}_Ricetta.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true, useCORS: true },
+                // Aumento lo scale per una maggiore risoluzione del canvas (utile su mobile)
+                html2canvas: { scale: 3, logging: false, dpi: 192, letterRendering: true, useCORS: true }, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
+            
+            // 5. Utilizza setTimeout per dare al browser un attimo per calcolare l'altezza esatta
+            setTimeout(() => {
+                 // Usa il contenuto interno come sorgente per garantire che le dimensioni siano calcolate correttamente
+                 const contentElement = pdfContainer.querySelector('#pdf-document-content');
+                 
+                 html2pdf().from(contentElement).set(options).save()
+                    .then(() => {
+                        showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
+                        pdfContainer.innerHTML = ''; // Pulisce il contenitore nascosto
+                    })
+                    .catch(error => {
+                        console.error('Errore durante la generazione del PDF:', error);
+                        showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
+                        pdfContainer.innerHTML = '';
+                    });
+            }, 50); // Un breve ritardo di 50ms per stabilizzare il rendering
 
-            // 5. Genera e scarica il PDF
-            html2pdf().from(pdfContainer.querySelector('#pdf-document-content')).set(options).save()
-                .then(() => {
-                    showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
-                    pdfContainer.innerHTML = ''; // Pulisce il contenitore nascosto
-                })
-                .catch(error => {
-                    console.error('Errore durante la generazione del PDF:', error);
-                    showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
-                    pdfContainer.innerHTML = '';
-                });
         };
 
         // --- RECIPE RENDERING & FILTERING (omissis) ---
@@ -1083,6 +1118,7 @@
                 // Colori tematici per Salato/Dolce
                 const typeColorClass = recipe.type === 'Dolce' ? 'rose-400' : 'green-700'; 
                 
+                // Aggiornato: usa grid-cols-1 su mobile (default) e sm:grid-cols-2 lg:grid-cols-3 su desktop
                 const recipeCard = document.createElement('div');
                 recipeCard.className = `recipe-card bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between border-t-4 border-${typeColorClass} border-b-2`;
                 
@@ -1124,7 +1160,9 @@
                 recipeCard.innerHTML = `
                     <div>
                         <div class="flex items-center justify-between mb-3">
-                            <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">${recipe.type}</span>
+                            <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">
+                                ${recipe.type}
+                            </span>
                             <p class="text-xs text-gray-500">di <span class="font-semibold text-gray-700">${recipe.userName}</span></p>
                         </div>
                         
@@ -1135,7 +1173,7 @@
                             ${ingredientsListHtml}
                         </div>
                         <div class="mb-4">
-                            <h4 class="text-md font-semibold text-gray-800 mb-1">Procedimento:</h4>
+                            <h4 class="text-md font-semibold text-gray-800 mb-1">Istruzioni (Anteprima):</h4>
                             <p class="text-gray-600 text-sm max-h-16 overflow-hidden">${recipe.instructions.substring(0, 150)}...</p>
                         </div>
                     </div>
