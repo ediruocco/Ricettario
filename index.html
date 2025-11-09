@@ -159,7 +159,7 @@
     <!-- FOOTER AGGIORNATO: Contiene solo la dicitura -->
     <footer class="bg-amber-50 shadow-sm border-t border-amber-200 mt-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
-            <p class="text-xs sm:text-sm text-gray-600">
+            <p class="text-xs sm:text-sm text-green-600">
                 © Questo progetto contiene codice generato con l'assistenza di Google Gemini 2.5 Flash.<br>
                 Le parti generate da AI sono state revisionate, modificate ed integrate da Ernesto Di Ruocco.
             </p>
@@ -273,7 +273,7 @@
                 
                 <!-- Istruzioni -->
                 <div class="mb-6">
-                    <label for="recipe-instructions" class="block text-sm font-medium text-gray-700">Istruzioni</label>
+                    <label for="recipe-instructions" class="block text-sm font-medium text-gray-700">Procedimento</label>
                     <textarea id="recipe-instructions" rows="6" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"></textarea>
                 </div>
 
@@ -963,9 +963,9 @@
                         </div>
                     </div>
 
-                    <!-- Istruzioni -->
+                    <!-- Procedimento -->
                     <div>
-                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Istruzioni</h2>
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Procedimento</h2>
                         <div class="bg-gray-50 p-4 sm:p-6 rounded-lg shadow-inner">
                             ${instructionsListHtml}
                         </div>
@@ -1055,7 +1055,7 @@
                         ${ingredientsHtml}
                     </div>
 
-                    <h2 style="font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 30px; margin-bottom: 10px; border-bottom: 2px solid ${typeColor}; padding-bottom: 5px;">Istruzioni</h2>
+                    <h2 style="font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 30px; margin-bottom: 10px; border-bottom: 2px solid ${typeColor}; padding-bottom: 5px;">Procedimento</h2>
                     ${instructionsHtml}
                 </div>
             `;
@@ -1236,7 +1236,7 @@
                             ${ingredientsListHtml}
                         </div>
                         <div class="mb-4">
-                            <h4 class="text-md font-semibold text-gray-800 mb-1">Istruzioni (Anteprima):</h4>
+                            <h4 class="text-md font-semibold text-gray-800 mb-1">Procedimento:</h4>
                             <p class="text-gray-600 text-sm max-h-16 overflow-hidden">${recipe.instructions.substring(0, 150)}...</p>
                         </div>
                     </div>
