@@ -14,14 +14,7 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #FAF7F2; /* Sfondo crema/lino per un effetto ricettario */
-            background-image: url('./background.jpg'); /* Immagine di sfondo per un effetto visivo, con URL di fallback */
-            background-size: cover; /* L'immagine di sfondo copre l'intera area del contenitore */
-            background-position: center; /* Centra l'immagine di sfondo */
-            /*background-blend-mode: overlay; /* Miscela l'immagine di sfondo con il colore di sfondo, creando un effetto overlay */
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
-
         .recipe-card {
             transition: all 0.3s ease;
             cursor: pointer; /* Indica che è cliccabile */
@@ -59,16 +52,21 @@
         .ingredient-item:last-child {
             border-bottom: none;
         }
-        /* Contenitore Nascosto per il PDF: deve essere fuori dallo schermo ma avere dimensioni reali per html2pdf */
+        
+        /* Contenitore Nascosto per il PDF: Configurazione iniziale off-screen */
         .pdf-content-container {
-            position: absolute;
-            left: -9999px; /* Spostato fuori dallo schermo */
+            position: absolute; 
+            left: -9999px; /* Spostato molto fuori dallo schermo */
             top: 0;
-            width: 800px; /* Larghezza definita per una corretta formattazione A4 */
+            width: 800px; /* Larghezza fissa per la formattazione A4 */
             height: auto;
             background-color: white;
-            font-family: 'Inter', sans-serif;
-            padding: 20px;
+            z-index: -10; 
+        }
+        
+        /* La classe per rendere il body non scrollabile durante la preparazione del PDF */
+        body.is-preparing-pdf {
+            overflow: hidden;
         }
         
         /* Stili specifici per il modale dettaglio a schermo intero */
@@ -85,13 +83,6 @@
                  padding: 3rem; /* Padding maggiore su desktop */
             }
         }
-
-            /* Disabilita background-attachment:fixed sui dispositivi mobili per migliori prestazioni */
-        @media (max-width: 768px) {
-           body {
-               background-attachment: scroll;
-            }
-        }
         
     </style>
 </head>
@@ -102,8 +93,10 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
             <h1 class="text-2xl sm:text-3xl font-bold text-green-800">Il Mio Ricettario</h1>
             <div class="flex items-center space-x-2 sm:space-x-4"> 
-                <!-- Pulsante Le Mie Ricette / Tutte le Ricette -->
-                <button id="my-recipes-toggle-btn" class="hidden font-semibold py-2 px-3 sm:px-4 rounded-lg transition duration-150 text-xs sm:text-sm whitespace-nowrap"></button>
+                <!-- Pulsante Le Mie Ricette / Tutte le Ricette (AGGIORNATO: piú piccolo e centrato su mobile) -->
+                <button id="my-recipes-toggle-btn" 
+                        class="hidden font-semibold py-1 px-2 sm:py-2 sm:px-4 rounded-lg transition duration-150 text-xs sm:text-sm text-center">
+                </button>
                 <div id="auth-controls" class="flex space-x-3 items-center">
                     <div class="text-sm text-gray-500">Caricamento stato...</div>
                 </div>
@@ -113,8 +106,6 @@
 
     <!-- Contenitore Principale -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-
-        
         
         <!-- Controlli di Filtro e Ricerca (REPSONSIVE OPTIMIZED) -->
         <div class="bg-amber-100 p-4 sm:p-6 rounded-xl shadow-lg mb-6 sm:mb-8 flex flex-col space-y-3 md:space-y-0 md:flex-row md:space-x-4 border border-amber-200">
@@ -143,7 +134,7 @@
             <p class="text-gray-500 col-span-full">Caricamento ricette...</p>
         </div>
 
-        <!-- Contenitore nascosto per la generazione del PDF -->
+        <!-- Contenitore nascosto per la generazione del PDF (utilizza la tecnica absolute left:-9999px) -->
         <div id="pdf-container" class="pdf-content-container"></div>
 
 
@@ -151,13 +142,10 @@
         <div id="feedback-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
     </main>
 
-    <!-- NUOVO FOOTER -->
+    <!-- FOOTER AGGIORNATO: Contiene solo la dicitura -->
     <footer class="bg-amber-50 shadow-sm border-t border-amber-200 mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row justify-center items-center text-center space-y-4 md:space-y-0">
-            
-          
-            <!-- Elemento 1: Dicitura -->
-            <p class="text-xs sm:text-sm text-green-600 md:text-center">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+            <p class="text-xs sm:text-sm text-gray-600">
                 © Questo progetto contiene codice generato con l'assistenza di Google Gemini 2.5 Flash.<br>
                 Le parti generate da AI sono state revisionate, modificate ed integrate da Ernesto Di Ruocco.
             </p>
@@ -462,18 +450,35 @@
                 toggleBtn.classList.remove('hidden');
                 toggleBtn.onclick = window.toggleRecipeView; // Collega il toggle
                 
+                let contentHTML = '';
+
                 // 2. Contenuto e Stile
                 if (currentView === 'My') {
                     // Stai visualizzando SOLO le tue ricette -> Pulsante per tornare a TUTTE
-                    toggleBtn.textContent = 'Tutte le Ricette'; 
+                    
+                    // Contenuto per la visualizzazione: "Tutte le Ricette" (desktop) / "Tutte<br>Ricette" (mobile)
+                    contentHTML = `
+                        <span class="hidden sm:inline whitespace-nowrap">Tutte le Ricette</span>
+                        <span class="inline sm:hidden leading-tight">Tutte<br>Ricette</span>
+                    `;
+
                     toggleBtn.classList.remove('bg-amber-200', 'text-green-800', 'hover:bg-amber-300');
                     toggleBtn.classList.add('bg-green-700', 'text-white', 'shadow-md', 'hover:bg-green-800');
                 } else {
                     // Stai visualizzando TUTTE le ricette -> Pulsante per passare a MIE
-                    toggleBtn.textContent = 'Le mie Ricette'; 
+                    
+                    // Contenuto per la visualizzazione: "Le mie Ricette" (desktop) / "Le mie<br>Ricette" (mobile)
+                    contentHTML = `
+                        <span class="hidden sm:inline whitespace-nowrap">Le mie Ricette</span>
+                        <span class="inline sm:hidden leading-tight">Le mie<br>Ricette</span>
+                    `;
+
                     toggleBtn.classList.remove('bg-green-700', 'text-white', 'shadow-md', 'hover:bg-green-800');
                     toggleBtn.classList.add('bg-amber-200', 'text-green-800', 'hover:bg-amber-300');
                 }
+
+                toggleBtn.innerHTML = contentHTML;
+
             } else {
                 // Nascondi se non autenticato
                 toggleBtn.classList.add('hidden');
@@ -482,7 +487,7 @@
         }
 
 
-        // --- ACCOUNT MANAGEMENT MODAL LOGIC (NUOVO) ---
+        // --- ACCOUNT MANAGEMENT MODAL LOGIC (omissis) ---
 
         /**
          * Mostra il modale per la gestione dell'account e imposta la modalità (reset o update)
@@ -600,7 +605,7 @@
         };
         
 
-        // --- AUTHENTICATION LOGIC ---
+        // --- AUTHENTICATION LOGIC (omissis) ---
 
         function updateAuthUI() {
             const authControls = document.getElementById('auth-controls');
@@ -611,11 +616,19 @@
                     // Utente Autenticato (Email/Password)
                     const displayUser = userName || auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
                     authControls.innerHTML = `
-                        <div class="flex flex-col items-end">
-                            <span class="text-sm font-semibold text-gray-700">Ciao, ${displayUser}</span>
-                            <button onclick="showAccountModal('update')" class="text-xs text-blue-500 hover:text-blue-700 mt-0.5">Gestisci Account</button>
+                        <div class="flex flex-col items-end min-w-0">
+                            <!-- Tronca il testo utente su schermi extra-small se troppo lungo -->
+                            <span class="text-sm font-semibold text-gray-700 truncate max-w-[100px] sm:max-w-none">${displayUser}</span>
+                            <button onclick="showAccountModal('update')" class="text-xs text-blue-500 hover:text-blue-700 mt-0.5 whitespace-nowrap">Gestisci Account</button>
                         </div>
-                        <button onclick="logoutUser()" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition text-sm">Logout</button>
+                        <button onclick="logoutUser()" class="bg-red-500 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg hover:bg-red-600 transition text-sm flex items-center justify-center">
+                            <!-- Icona di uscita (visibile su mobile) -->
+                            <svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H5a3 3 0 01-3-3v-12a3 3 0 013-3h5a3 3 0 013 3v1"></path>
+                            </svg>
+                            <!-- Testo "Logout" (visibile su schermi sm e superiori) -->
+                            <span class="hidden sm:inline">Logout</span>
+                        </button>
                     `;
                     addRecipeBtn.classList.remove('hidden');
                 } else {
@@ -948,7 +961,7 @@
             
             // 4. Collega i pulsanti di azione
             detailPdfBtn.onclick = () => {
-                // Previene che il modale dettaglio chiuda il PDF.
+                // Chiude il modale dettaglio PRIMA di iniziare la generazione
                 closeModal(null, 'detail-modal'); 
                 generateRecipePdf(recipe.id);
             };
@@ -970,14 +983,15 @@
             showModal('detail-modal');
         };
 
-        // --- PDF GENERATION LOGIC (omissis) ---
+        // --- PDF GENERATION LOGIC (FIXED - Versione 7: Forza Rendering con Opacità) ---
 
         /**
          * Genera e scarica il PDF della ricetta dato il suo ID.
+         * Versione 7: Forza il calcolo del layout portando il container off-screen
+         * nel viewport (top:0, left:0) ma con opacità 0.
          * @param {string} recipeId L'ID della ricetta da scaricare.
          */
         window.generateRecipePdf = (recipeId) => {
-            // 1. Trova la ricetta completa dalla cache locale
             const recipe = recipes.find(r => r.id === recipeId);
 
             if (!recipe) {
@@ -988,14 +1002,14 @@
             showFeedback('Generazione PDF in corso...');
             
             const pdfContainer = document.getElementById('pdf-container');
+            const body = document.body;
+            pdfContainer.innerHTML = ''; // Pulisce il contenitore precedente (IMPORTANTE!)
             
-            // Colori tematici per Salato/Dolce
-            const typeColor = recipe.type === 'Dolce' ? '#f472b6' : '#047857'; // Tailwind rose-400 vs green-700
-            const typeBg = recipe.type === 'Dolce' ? '#fde0e6' : '#d1fae5'; // Light background
+            const typeColor = recipe.type === 'Dolce' ? '#f472b6' : '#047857'; 
+            const typeBg = recipe.type === 'Dolce' ? '#fde0e6' : '#d1fae5'; 
 
-            // 2. Costruisci il contenuto HTML per il PDF in un formato leggibile e stampabile
+            // 1. Costruisci il contenuto HTML (il codice è rimasto invariato e pulito)
             let ingredientsHtml = '<ul style="list-style: none; padding: 0;">';
-            // Utilizza un semplice forEach/map per creare le righe di testo
             recipe.ingredients.forEach(ing => {
                 ingredientsHtml += `<li style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #ddd; font-size: 14px;">
                     <span style="font-weight: 500;">${ing.nome || 'N/D'}</span>
@@ -1004,7 +1018,6 @@
             });
             ingredientsHtml += '</ul>';
             
-            // Le istruzioni vanno convertite in un elenco numerato
             const instructionsArray = recipe.instructions.split('\n').filter(line => line.trim() !== '');
             let instructionsHtml = '<ol style="padding-left: 20px; margin: 0; list-style-type: decimal;">';
             instructionsArray.forEach(step => {
@@ -1012,10 +1025,9 @@
             });
             instructionsHtml += '</ol>';
 
-
-            // 3. Inietta l'HTML nel contenitore nascosto
+            // 2. Inietta l'HTML
             pdfContainer.innerHTML = `
-                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                <div id="pdf-document-content" style="padding: 30px; border: 4px solid ${typeColor}; border-radius: 12px; background-color: #ffffff; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 100%;">
                     <h1 style="font-size: 32px; font-weight: bold; color: #1f2937; margin-bottom: 5px; text-align: center;">${recipe.name}</h1>
                     <div style="margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                         <span style="background-color: ${typeBg}; color: ${typeColor}; padding: 4px 12px; border-radius: 9999px; font-size: 14px; font-weight: 600;">
@@ -1034,25 +1046,51 @@
                 </div>
             `;
             
+            // 3. Modifica gli stili per forzare il rendering in un contenitore nascosto ma nel viewport
+            const originalStyles = {
+                position: pdfContainer.style.position,
+                left: pdfContainer.style.left,
+                opacity: pdfContainer.style.opacity,
+                zIndex: pdfContainer.style.zIndex,
+            };
+
+            // Imposta stili temporanei per forzare il rendering completo
+            pdfContainer.style.position = 'fixed'; 
+            pdfContainer.style.top = '0';
+            pdfContainer.style.left = '0'; // Nel viewport
+            pdfContainer.style.opacity = '0'; // Invisibile
+            pdfContainer.style.zIndex = '9999'; // Sopra tutto
+            body.classList.add('is-preparing-pdf'); // Blocca lo scrolling del body
+
+            const contentElement = pdfContainer.querySelector('#pdf-document-content');
+            
             // 4. Opzioni di configurazione per html2pdf
             const options = {
                 margin: 10,
                 filename: `${recipe.name.replace(/\s/g, '_')}_Ricetta.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true, useCORS: true },
+                // Utilizza un'alta risoluzione per il canvas
+                html2canvas: { scale: 3, logging: false, dpi: 192, letterRendering: true, useCORS: true }, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
-
-            // 5. Genera e scarica il PDF
-            html2pdf().from(pdfContainer.querySelector('#pdf-document-content')).set(options).save()
+            
+            // 5. Genera il PDF
+            html2pdf().from(contentElement).set(options).save()
                 .then(() => {
                     showFeedback(`PDF di "${recipe.name}" scaricato con successo.`);
-                    pdfContainer.innerHTML = ''; // Pulisce il contenitore nascosto
                 })
                 .catch(error => {
                     console.error('Errore durante la generazione del PDF:', error);
                     showFeedback('Errore nella generazione del PDF. Controlla la console per i dettagli.', true);
-                    pdfContainer.innerHTML = '';
+                })
+                .finally(() => {
+                    // 6. Pulisce e ripristina gli stili originali
+                    pdfContainer.innerHTML = ''; 
+                    pdfContainer.style.position = originalStyles.position;
+                    pdfContainer.style.left = originalStyles.left;
+                    pdfContainer.style.opacity = originalStyles.opacity;
+                    pdfContainer.style.zIndex = originalStyles.zIndex;
+                    body.classList.remove('is-preparing-pdf');
                 });
         };
 
@@ -1171,7 +1209,9 @@
                 recipeCard.innerHTML = `
                     <div>
                         <div class="flex items-center justify-between mb-3">
-                            <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">${recipe.type}</span>
+                            <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">
+                                ${recipe.type}
+                            </span>
                             <p class="text-xs text-gray-500">di <span class="font-semibold text-gray-700">${recipe.userName}</span></p>
                         </div>
                         
@@ -1229,19 +1269,17 @@
                         userId = user.uid;
                         userName = user.displayName || (user.email ? user.email.split('@')[0] : 'Utente Anonimo');
 
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            try {
-                                // signInWithCustomToken gestito dall'ambiente.
-                            } catch (e) {
-                                console.error("Errore nell'autenticazione con token custom (Ignorato in ambiente di test):", e);
-                            }
-                        }
+                        // L'autenticazione custom (se presente) viene gestita dall'ambiente esterno
+                        // Non è necessario re-implementare signInWithCustomToken qui se la `user` è già fornita
                     } else {
                         // Utente disconnesso (locale): esegui l'accesso anonimo per consentire la lettura pubblica
                         if (auth.currentUser === null || auth.currentUser.isAnonymous === false) {
-                            signInAnonymously(auth).catch(e => {
+                            // Prova ad accedere anonimamente per la lettura pubblica
+                            try {
+                                await signInAnonymously(auth);
+                            } catch (e) {
                                 console.error("Errore nell'accesso anonimo:", e);
-                            });
+                            }
                         }
                         userId = auth.currentUser?.uid || null;
                         userName = null;
@@ -1252,7 +1290,9 @@
 
                     // 2. Controllo e semina dei dati (esegui solo dopo che auth è pronto)
                     const recipesRef = collection(db, getRecipesCollectionPath());
-                    const initialSnapshot = await getDocs(recipesRef);
+                    // Aggiungiamo un check leggero per evitare il seeding ad ogni refresh
+                    const q = query(recipesRef);
+                    const initialSnapshot = await getDocs(q);
                     if (initialSnapshot.empty) {
                         await seedDatabase();
                     }
