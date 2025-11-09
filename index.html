@@ -14,6 +14,12 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #FAF7F2; /* Sfondo crema/lino per un effetto ricettario */
+            background-image: url('./background.jpg'); /* Immagine di sfondo per un effetto visivo, con URL di fallback */
+            background-size: contain; /* L'immagine di sfondo copre l'intera area del contenitore */
+            background-position: center; /* Centra l'immagine di sfondo */
+            /*background-blend-mode: overlay; /* Miscela l'immagine di sfondo con il colore di sfondo, creando un effetto overlay */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;; /* Sfondo crema/lino per un effetto ricettario */
         }
         .recipe-card {
             transition: all 0.3s ease;
@@ -81,6 +87,14 @@
         @media (min-width: 1024px) { /* lg breakpoint */
             #detail-modal .modal-content {
                  padding: 3rem; /* Padding maggiore su desktop */
+            }
+        }
+
+        /* Disabilita background-attachment:fixed sui dispositivi mobili per migliori prestazioni */
+        @media (max-width: 768px) {
+           body {
+                background-size: contain;
+                background-attachment: scroll;
             }
         }
         
