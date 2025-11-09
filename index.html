@@ -250,7 +250,7 @@
                 <!-- Nome Ricetta -->
                 <div class="mb-4">
                     <label for="recipe-name" class="block text-sm font-medium text-gray-700">Nome Ricetta</label>
-                    <input type="text" id="recipe-name" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                    <input type="text" id="recipe-name" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Pasta al Pesto">  
                 </div>
 
                 <!-- Tipo -->
@@ -265,16 +265,16 @@
                 <!-- Ingredienti Strutturati -->
                 <div class="mb-4">
                     <label for="recipe-ingredients" class="block text-sm font-medium text-gray-700">
-                        Ingredienti (Nome e Quantità, separati da un trattino o spazio)
-                        <span class="text-xs text-gray-500 block">Es: Farina - 100gr, Uova - 2</span>
+                        Ingredienti (Nome e Quantità, separati da un trattino)
+                        <!--<span class="text-xs text-gray-500 block">Es: Farina - 100gr, Uova - 2</span>-->
                     </label>
-                    <textarea id="recipe-ingredients" rows="4" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Farina - 100gr&#10;Acqua - 50ml&#10;Sale - q.b."></textarea>
+                    <textarea id="recipe-ingredients" rows="4" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Pasta - 320gr&#10;Pesto - 180ml&#10;Pinoli - q.b.&#10;Parmigiano Reggiano - 50gr"></textarea>
                 </div>
                 
                 <!-- Istruzioni -->
                 <div class="mb-6">
                     <label for="recipe-instructions" class="block text-sm font-medium text-gray-700">Procedimento</label>
-                    <textarea id="recipe-instructions" rows="6" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"></textarea>
+                    <textarea id="recipe-instructions" rows="6" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Cuoci la pasta in abbondante acqua salata.&#10;Scola la pasta al dente.&#10;Versa la pasta direttamente nella ciotola con il pesto e mescola bene.&#10;Servi immediatamente con pinoli tostati e scaglie di parmigiano Reggiano."></textarea>
                 </div>
 
                 <button type="submit" id="recipe-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 text-sm sm:text-base">
@@ -1211,7 +1211,7 @@
                                     <span class="text-right font-medium text-gray-600">${ing.quantita || 'q.b.'}</span>
                                 </div>
                             `).join('')}
-                            ${recipe.ingredients.length > 4 ? '<p class="text-xs text-center pt-1 text-gray-500">... Altri ingredienti ...</p>' : ''}
+                            ${recipe.ingredients.length > 10 ? '<p class="text-xs text-center pt-1 text-gray-500">... Altri ingredienti ...</p>' : ''}
                         </div>
                     `;
                 }
