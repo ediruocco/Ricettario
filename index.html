@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./icona.png" type="image/png" class="icona">
     <title>Ricettario Interattivo</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libreria per la generazione di PDF (html2pdf) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <style>
-        /* Stile personalizzato per un look moderno e pulito a tema cucina */
+     /* Stile personalizzato per un look moderno e pulito a tema cucina */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
@@ -262,6 +264,12 @@
                     </select>
                 </div>
                 
+                <!-- Note: Porzioni / Numero persone -->
+                <div class="mb-4">
+                    <label for="recipe-notes" class="block text-sm font-medium text-gray-700">Porzioni / Numero persone</label>
+                    <textarea id="recipe-notes" rows="1" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Es: 4 porzioni o 2 persone"></textarea>
+                </div>
+
                 <!-- Ingredienti Strutturati -->
                 <div class="mb-4">
                     <label for="recipe-ingredients" class="block text-sm font-medium text-gray-700">
@@ -276,7 +284,7 @@
                     <label for="recipe-instructions" class="block text-sm font-medium text-gray-700">Procedimento</label>
                     <textarea id="recipe-instructions" rows="6" required class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" placeholder="Cuoci la pasta in abbondante acqua salata.&#10;Scola la pasta al dente.&#10;Versa la pasta direttamente nella ciotola con il pesto e mescola bene.&#10;Servi immediatamente con pinoli tostati e scaglie di parmigiano Reggiano."></textarea>
                 </div>
-
+                
                 <button type="submit" id="recipe-submit-btn" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-700 transition duration-150 text-sm sm:text-base">
                     Salva Ricetta
                 </button>
@@ -391,16 +399,21 @@
                     document.getElementById('recipe-id').value = recipe.id;
                     document.getElementById('recipe-name').value = recipe.name;
                     document.getElementById('recipe-type').value = recipe.type;
+                   
                     
                     // Converte l'array di oggetti ingredienti in una stringa "Nome - Quantità"
                     const ingredientsString = recipe.ingredients.map(ing => `${ing.nome} - ${ing.quantita}`).join('\n');
                     document.getElementById('recipe-ingredients').value = ingredientsString; 
                     
                     document.getElementById('recipe-instructions').value = recipe.instructions;
+                    // Popola il campo Note (se presente)
+                    document.getElementById('recipe-notes').value = recipe.notes || '';
                     document.getElementById('recipe-submit-btn').textContent = 'Aggiorna Ricetta';
                 } else if (id === 'recipe-modal' && !recipe) {
                     document.getElementById('recipe-modal-title').textContent = 'Aggiungi Nuova Ricetta';
                     document.getElementById('recipe-form').reset();
+                    // Assicura che il campo note sia vuoto dopo il reset
+                    document.getElementById('recipe-notes').value = '';
                     document.getElementById('recipe-id').value = '';
                     document.getElementById('recipe-submit-btn').textContent = 'Salva Ricetta';
                 } else if (id === 'delete-modal' && recipe) {
@@ -793,6 +806,7 @@
             {
                 name: "Pasta al Pesto",
                 type: "Salato",
+                notes: "5 porzioni",
                 ingredients: [
                     { nome: "Pasta", quantita: "320gr" },
                     { nome: "Pesto", quantita: "180gr" },
@@ -806,6 +820,7 @@
             {
                 name: "Tiramisù Classico",
                 type: "Dolce",
+                notes: "Per 4 persone",
                 ingredients: [
                     { nome: "Savoiardi", quantita: "250gr" },
                     { nome: "Mascarpone", quantita: "500gr" },
@@ -856,12 +871,14 @@
             }
             
             const instructions = document.getElementById('recipe-instructions').value.trim();
+            const notes = document.getElementById('recipe-notes').value.trim();
             
             const currentUserName = auth.currentUser.displayName || auth.currentUser?.email.split('@')[0] || 'Utente Sconosciuto';
             userName = currentUserName;
 
             const recipeData = {
                 name, type, ingredients, instructions,
+                notes,
                 userId: userId,
                 userName: currentUserName
             };
@@ -927,7 +944,7 @@
             const detailPdfBtn = document.getElementById('detail-pdf-btn');
             
             const isAuthor = userId === recipe.userId && auth.currentUser && !auth.currentUser.isAnonymous; 
-            const typeColorClass = recipe.type === 'Dolce' ? 'rose-500' : 'green-700';
+            const typeColorClass = recipe.type === 'Dolce' ? 'rose-500' : 'green-700';           
             
             // 1. Genera l'HTML per gli ingredienti
             let ingredientsListHtml = '';
@@ -963,13 +980,22 @@
             // 3. Inietta il contenuto nel modale
             detailContentEl.innerHTML = `
                 <div class="mb-6">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2">
+                    <div class="flex sm:flex-col lg:flex-row items-start sm:items-center justify-between mb-2">
                          <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2 sm:mb-0">${recipe.name}</h1>
                          <span class="inline-block text-sm font-bold py-1 px-4 rounded-full text-white bg-${typeColorClass} whitespace-nowrap">${recipe.type}</span>
+                    </div>  
+
+                    <div class="flex sm:flex-col lg:flex-row items-start sm:items-center justify-between mb-2">     
+                        
+                        ${recipe.notes ? `                                                   
+                            <p class="text-2xl font-bold text-${typeColorClass}">${recipe.notes}</p>                        
+                    ` : ''}
+                        
+                        <p class="text-sm sm:text-md text-gray-500">
+                            di <span class="font-semibold text-gray-700">${recipe.userName}</span>
+                        </p>
+                    
                     </div>
-                    <p class="text-sm sm:text-md text-gray-500">
-                        di <span class="font-semibold text-gray-700">${recipe.userName}</span>
-                    </p>
                 </div>
                 
                 <!-- Contenitore Principale: Utilizza grid-cols-1 su mobile e grid-cols-2 da schermi grandi (lg) -->
@@ -1067,8 +1093,11 @@
                         <span style="background-color: ${typeBg}; color: ${typeColor}; padding: 4px 12px; border-radius: 9999px; font-size: 14px; font-weight: 600;">
                             ${recipe.type}
                         </span>
+                        ${recipe.notes ? '<div><p style="font-size:14px;color:' + typeColor + ';margin:0 0 6px 0;">' + recipe.notes + '</p></div>' : ''}
                         <p style="font-size: 14px; color: #6b7280;">Autore: <span style="font-weight: 600; color: #374151;">${recipe.userName}</span></p>
                     </div>
+
+                    
 
                     <h2 style="font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid ${typeColor}; padding-bottom: 5px;">Ingredienti</h2>
                     <div style="border: 1px solid #f3f4f6; padding: 10px; border-radius: 6px;">
@@ -1304,7 +1333,6 @@
                 // Aggiornato: usa grid-cols-1 su mobile (default) e sm:grid-cols-2 lg:grid-cols-3 su desktop
                 const recipeCard = document.createElement('div');
                 recipeCard.className = `recipe-card bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between border-t-4 border-${typeColorClass} border-b-2`;
-                
                 // Aggiungiamo l'handler per il click sulla CARD che apre il modale di dettaglio
                 recipeCard.onclick = (e) => {
                     // Previene l'esecuzione se il click è su un pulsante all'interno della card
@@ -1375,11 +1403,16 @@
                         <div class="flex items-center justify-between mb-3">
                             <span class="inline-block text-xs font-semibold py-1 px-3 rounded-full text-white bg-${typeColorClass}">
                                 ${recipe.type}
-                            </span>
+                            </span>                            
                             <p class="text-xs text-gray-500">di <span class="font-semibold text-gray-700">${recipe.userName}</span></p>
                         </div>
                         
-                        <h3 class="text-xl font-bold text-gray-900 mb-4">${recipe.name}</h3>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xl font-bold text-gray-900 mb-4">${recipe.name}</h3>
+                            <span class="text-x1 font-semibold mb-4 text-${typeColorClass}">
+                                    ${recipe.notes}
+                            </span>
+                        </div>    
 
                         <div class="mb-4">
                             <h4 class="text-md font-semibold text-gray-800 mb-2">Ingredienti:</h4>
